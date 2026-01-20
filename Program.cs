@@ -125,6 +125,8 @@ app.MapProgressionEndpoints();
 app.MapMatchmakingEndpoints();
 app.MapMatchReportEndpoints();
 
+app.MapGet("/", () => new { message = "Harbinger Server is Live!", status = "Running", documentation = "/swagger" });
+
 app.MapGet("/health", () => Results.Json(new { status = "ok" }))
     .WithName("Health");
 
