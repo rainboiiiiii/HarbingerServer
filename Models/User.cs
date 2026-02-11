@@ -3,6 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace GameBackend.Api.Models;
 
+[BsonIgnoreExtraElements]
 public class User
 {
     [BsonId]
@@ -59,6 +60,9 @@ public class User
 
     [BsonElement("currentSeason")]
     public int CurrentSeason { get; set; }
+
+    [BsonElement("seasonPassXp")]
+    public long SeasonPassXp { get; set; }
 
     [BsonElement("lastClaimedAt")]
     public DateTime? LastClaimedAt { get; set; }

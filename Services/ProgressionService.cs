@@ -181,7 +181,8 @@ public class ProgressionService
             claimedPremium,
             user.Dust,
             user.Crystals,
-            user.Inventory);
+            user.Inventory,
+            user.SeasonPassXp);
     }
 
     private int CalculateLevel(long xp)
@@ -210,6 +211,7 @@ public class ProgressionService
             // Reset seasonal progress but KEEP Dust, Crystals, and Inventory
             user.Xp = 0;
             user.Level = 0;
+            user.SeasonPassXp = 0;
             user.HasPremiumPass = false;
             user.CurrentSeason = desiredSeason;
             needsUpdate = true;

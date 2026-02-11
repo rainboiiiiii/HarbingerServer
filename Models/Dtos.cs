@@ -18,7 +18,8 @@ public record ProgressionResponse(
     IReadOnlyCollection<int> ClaimedPremiumTiers,
     int Dust,
     int Crystals,
-    List<string> Inventory);
+    List<string> Inventory,
+    long SeasonPassXp = 0);
 
 public class AddXpRequest
 {
