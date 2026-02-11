@@ -61,6 +61,27 @@ public class ProgressionService
         return await BuildResponseAsync(userId, progression, ct);
     }
 
+    public async Task<ProgressionResponse> GrantItemsAsync(string userId, List<string> items, CancellationToken ct = default)
+    {
+        var progression = await EnsureProgressionAsync(userId, ct);
+        bool changed = false;
+        foreach (var item in items)
+        {
+            if (!progression.Inventory.Contains(item))
+            {
+                progression.Inventory.Add(item);
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            await _db.UserProgressions.ReplaceOneAsync(p => p.Id == userId, progression, new ReplaceOptions { IsUpsert = true }, ct);
+        }
+
+        return await BuildResponseAsync(userId, progression, ct);
+    }
+
     public async Task<ProgressionResponse> PurchaseItemAsync(string userId, string itemId, string currencyType, int cost, CancellationToken ct = default)
     {
         var progression = await EnsureProgressionAsync(userId, ct);
