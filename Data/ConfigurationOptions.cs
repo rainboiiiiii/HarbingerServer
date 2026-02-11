@@ -34,3 +34,8 @@ public class CorsOptions
 {
     public string[] AllowedOrigins { get; set; } = Array.Empty<string>();
 }
+
+public class AdminOptions
+{
+    public string ApiKey { get; set; } = string.Empty;
+}

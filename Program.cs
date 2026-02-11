@@ -16,6 +16,7 @@ builder.Services.Configure<ProgressionOptions>(builder.Configuration.GetSection(
 builder.Services.Configure<BattlePassOptions>(builder.Configuration.GetSection("BattlePass"));
 builder.Services.Configure<MatchmakingOptions>(builder.Configuration.GetSection("Matchmaking"));
 builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection("Cors"));
+builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection("Admin"));
 
 builder.Services.Configure<JsonOptions>(options =>
 {
@@ -124,6 +125,9 @@ app.MapAccountEndpoints();
 app.MapProgressionEndpoints();
 app.MapMatchmakingEndpoints();
 app.MapMatchReportEndpoints();
+app.MapDiscordEndpoints();
+app.MapModerationEndpoints();
+app.MapAdminEndpoints();
 
 app.MapGet("/", () => new { message = "Harbinger Server is Live!", status = "Running", documentation = "/swagger" });
 

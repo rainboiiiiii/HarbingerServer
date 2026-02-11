@@ -29,6 +29,22 @@ public class MongoDbContext
     public IMongoCollection<UserBattlePassClaim> UserBattlePassClaims => _database.GetCollection<UserBattlePassClaim>("user_battlepass_claims");
     public IMongoCollection<QueueTicket> QueueTickets => _database.GetCollection<QueueTicket>("queue_tickets");
     public IMongoCollection<Match> Matches => _database.GetCollection<Match>("matches");
+    public IMongoCollection<Counter> Counters => _database.GetCollection<Counter>("counters");
+    public IMongoCollection<Warning> Warnings => _database.GetCollection<Warning>("warnings");
+
+    public async Task<long> GetNextSequenceAsync(string sequenceName, CancellationToken ct = default)
+    {
+        var filter = Builders<Counter>.Filter.Eq(c => c.Id, sequenceName);
+        var update = Builders<Counter>.Update.Inc(c => c.Seq, 1);
+        var options = new FindOneAndUpdateOptions<Counter>
+        {
+            IsUpsert = true,
+            ReturnDocument = ReturnDocument.After
+        };
+
+        var result = await Counters.FindOneAndUpdateAsync(filter, update, options, ct);
+        return result.Seq - 1; // 0-based index
+    }
 
     public async Task EnsureIndexesAsync(CancellationToken cancellationToken = default)
     {
@@ -38,6 +54,11 @@ public class MongoDbContext
             Builders<User>.IndexKeys.Ascending(u => u.UsernameNormalized),
             new CreateIndexOptions { Unique = true, Name = "idx_users_usernameNormalized_unique" });
         await Users.Indexes.CreateOneAsync(userIndex, cancellationToken: cancellationToken);
+
+        var discordIndex = new CreateIndexModel<User>(
+            Builders<User>.IndexKeys.Ascending(u => u.DiscordId),
+            new CreateIndexOptions { Name = "idx_users_discordId", Sparse = true });
+        await Users.Indexes.CreateOneAsync(discordIndex, cancellationToken: cancellationToken);
 
         var claimIndex = new CreateIndexModel<UserBattlePassClaim>(
             Builders<UserBattlePassClaim>.IndexKeys
