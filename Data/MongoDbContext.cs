@@ -25,7 +25,6 @@ public class MongoDbContext
     public MongoClient Client => _client;
 
     public IMongoCollection<User> Users => _database.GetCollection<User>("users");
-    public IMongoCollection<UserProgression> UserProgressions => _database.GetCollection<UserProgression>("user_progression");
     public IMongoCollection<UserBattlePassClaim> UserBattlePassClaims => _database.GetCollection<UserBattlePassClaim>("user_battlepass_claims");
     public IMongoCollection<QueueTicket> QueueTickets => _database.GetCollection<QueueTicket>("queue_tickets");
     public IMongoCollection<Match> Matches => _database.GetCollection<Match>("matches");

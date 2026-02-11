@@ -38,4 +38,28 @@ public class User
 
     [BsonElement("banExpiresAt")]
     public DateTime? BanExpiresAt { get; set; }
+
+    [BsonElement("xp")]
+    public long Xp { get; set; }
+
+    [BsonElement("level")]
+    public int Level { get; set; }
+
+    [BsonElement("dust")]
+    public int Dust { get; set; }
+
+    [BsonElement("crystals")]
+    public int Crystals { get; set; }
+
+    [BsonElement("inventory")]
+    public List<string> Inventory { get; set; } = new();
+
+    [BsonElement("hasPremiumPass")]
+    public bool HasPremiumPass { get; set; }
+
+    [BsonElement("currentSeason")]
+    public int CurrentSeason { get; set; }
+
+    [BsonElement("lastClaimedAt")]
+    public DateTime? LastClaimedAt { get; set; }
 }

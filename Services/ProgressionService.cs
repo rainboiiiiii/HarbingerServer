@@ -26,116 +26,116 @@ public class ProgressionService
 
     public async Task<ProgressionResponse> GetProgressionAsync(string userId, CancellationToken ct = default)
     {
-        var progression = await EnsureProgressionAsync(userId, ct);
-        return await BuildResponseAsync(userId, progression, ct);
+        var user = await EnsureProgressionAsync(userId, ct);
+        return await BuildResponseAsync(userId, user, ct);
     }
 
     public async Task<ProgressionResponse> AddXpAsync(string userId, long xpToAdd, CancellationToken ct = default)
     {
-        var progression = await EnsureProgressionAsync(userId, ct);
-        progression.Xp += xpToAdd;
-        progression.Level = CalculateLevel(progression.Xp);
-        await _db.UserProgressions.ReplaceOneAsync(
-            p => p.Id == userId,
-            progression,
+        var user = await EnsureProgressionAsync(userId, ct);
+        user.Xp += xpToAdd;
+        user.Level = CalculateLevel(user.Xp);
+        await _db.Users.ReplaceOneAsync(
+            u => u.Id == userId,
+            user,
             new ReplaceOptions { IsUpsert = true },
             ct);
 
-        return await BuildResponseAsync(userId, progression, ct);
+        return await BuildResponseAsync(userId, user, ct);
     }
 
     public async Task<ProgressionResponse> AddRewardsAsync(string userId, long xpToAdd, int dustToAdd, int crystalsToAdd, CancellationToken ct = default)
     {
-        var progression = await EnsureProgressionAsync(userId, ct);
-        progression.Xp += xpToAdd;
-        progression.Level = CalculateLevel(progression.Xp);
-        progression.Dust += dustToAdd;
-        progression.Crystals += crystalsToAdd;
+        var user = await EnsureProgressionAsync(userId, ct);
+        user.Xp += xpToAdd;
+        user.Level = CalculateLevel(user.Xp);
+        user.Dust += dustToAdd;
+        user.Crystals += crystalsToAdd;
 
-        await _db.UserProgressions.ReplaceOneAsync(
-            p => p.Id == userId,
-            progression,
+        await _db.Users.ReplaceOneAsync(
+            u => u.Id == userId,
+            user,
             new ReplaceOptions { IsUpsert = true },
             ct);
 
-        return await BuildResponseAsync(userId, progression, ct);
+        return await BuildResponseAsync(userId, user, ct);
     }
 
     public async Task<ProgressionResponse> GrantItemsAsync(string userId, List<string> items, CancellationToken ct = default)
     {
-        var progression = await EnsureProgressionAsync(userId, ct);
+        var user = await EnsureProgressionAsync(userId, ct);
         bool changed = false;
         foreach (var item in items)
         {
-            if (!progression.Inventory.Contains(item))
+            if (!user.Inventory.Contains(item))
             {
-                progression.Inventory.Add(item);
+                user.Inventory.Add(item);
                 changed = true;
             }
         }
 
         if (changed)
         {
-            await _db.UserProgressions.ReplaceOneAsync(p => p.Id == userId, progression, new ReplaceOptions { IsUpsert = true }, ct);
+            await _db.Users.ReplaceOneAsync(u => u.Id == userId, user, new ReplaceOptions { IsUpsert = true }, ct);
         }
 
-        return await BuildResponseAsync(userId, progression, ct);
+        return await BuildResponseAsync(userId, user, ct);
     }
 
     public async Task<ProgressionResponse> PurchaseItemAsync(string userId, string itemId, string currencyType, int cost, CancellationToken ct = default)
     {
-        var progression = await EnsureProgressionAsync(userId, ct);
+        var user = await EnsureProgressionAsync(userId, ct);
 
         // If already owned, don't charge, just return current state
-        if (progression.Inventory.Contains(itemId))
+        if (user.Inventory.Contains(itemId))
         {
-            return await BuildResponseAsync(userId, progression, ct);
+            return await BuildResponseAsync(userId, user, ct);
         }
 
         if (string.Equals(currencyType, "Dust", StringComparison.OrdinalIgnoreCase))
         {
-            if (progression.Dust < cost)
+            if (user.Dust < cost)
             {
                 throw new InvalidOperationException("Not enough dust");
             }
-            progression.Dust -= cost;
+            user.Dust -= cost;
         }
         else if (string.Equals(currencyType, "Crystals", StringComparison.OrdinalIgnoreCase))
         {
-            if (progression.Crystals < cost)
+            if (user.Crystals < cost)
             {
                 throw new InvalidOperationException("Not enough crystals");
             }
-            progression.Crystals -= cost;
+            user.Crystals -= cost;
         }
         else
         {
             throw new ArgumentException($"Invalid currency type: {currencyType}");
         }
 
-        progression.Inventory.Add(itemId);
+        user.Inventory.Add(itemId);
 
-        await _db.UserProgressions.ReplaceOneAsync(
-            p => p.Id == userId,
-            progression,
+        await _db.Users.ReplaceOneAsync(
+            u => u.Id == userId,
+            user,
             new ReplaceOptions { IsUpsert = true },
             ct);
 
-        return await BuildResponseAsync(userId, progression, ct);
+        return await BuildResponseAsync(userId, user, ct);
     }
 
     public async Task<ProgressionResponse> UnlockBattlePassAsync(string userId, CancellationToken ct = default)
     {
-        var progression = await EnsureProgressionAsync(userId, ct);
-        progression.HasPremiumPass = true;
-        await _db.UserProgressions.ReplaceOneAsync(p => p.Id == userId, progression, new ReplaceOptions { IsUpsert = true }, ct);
-        return await BuildResponseAsync(userId, progression, ct);
+        var user = await EnsureProgressionAsync(userId, ct);
+        user.HasPremiumPass = true;
+        await _db.Users.ReplaceOneAsync(u => u.Id == userId, user, new ReplaceOptions { IsUpsert = true }, ct);
+        return await BuildResponseAsync(userId, user, ct);
     }
 
     public async Task<(ProgressionResponse response, bool duplicate)> ClaimTierAsync(string userId, int tierIndex, bool isPremium, CancellationToken ct = default)
     {
-        var progression = await EnsureProgressionAsync(userId, ct);
-        if (isPremium && !progression.HasPremiumPass)
+        var user = await EnsureProgressionAsync(userId, ct);
+        if (isPremium && !user.HasPremiumPass)
         {
             throw new InvalidOperationException("Premium pass not unlocked");
         }
@@ -156,13 +156,13 @@ public class ProgressionService
         catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
         {
             _logger.LogWarning("Duplicate claim for user {UserId} season {Season} tier {Tier} premium {Premium}", userId, _battlePassOptions.CurrentSeason, tierIndex, isPremium);
-            return (await BuildResponseAsync(userId, progression, ct), true);
+            return (await BuildResponseAsync(userId, user, ct), true);
         }
 
-        return (await BuildResponseAsync(userId, progression, ct), false);
+        return (await BuildResponseAsync(userId, user, ct), false);
     }
 
-    private async Task<ProgressionResponse> BuildResponseAsync(string userId, UserProgression progression, CancellationToken ct)
+    private async Task<ProgressionResponse> BuildResponseAsync(string userId, User user, CancellationToken ct)
     {
         var claims = await _db.UserBattlePassClaims
             .Find(c => c.UserId == userId && c.Season == _battlePassOptions.CurrentSeason)
@@ -173,15 +173,15 @@ public class ProgressionService
 
         return new ProgressionResponse(
             userId,
-            progression.Xp,
-            CalculateLevel(progression.Xp),
-            progression.HasPremiumPass,
-            progression.CurrentSeason,
+            user.Xp,
+            CalculateLevel(user.Xp),
+            user.HasPremiumPass,
+            user.CurrentSeason,
             claimedFree,
             claimedPremium,
-            progression.Dust,
-            progression.Crystals,
-            progression.Inventory);
+            user.Dust,
+            user.Crystals,
+            user.Inventory);
     }
 
     private int CalculateLevel(long xp)
@@ -194,46 +194,40 @@ public class ProgressionService
         return (int)Math.Floor(xp / (double)_progressionOptions.XpPerLevel);
     }
 
-    private async Task<UserProgression> EnsureProgressionAsync(string userId, CancellationToken ct)
+    private async Task<User> EnsureProgressionAsync(string userId, CancellationToken ct)
     {
-        var progression = await _db.UserProgressions.Find(p => p.Id == userId).FirstOrDefaultAsync(ct);
-        var desiredSeason = _battlePassOptions.CurrentSeason;
-
-        if (progression == null)
+        var user = await _db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync(ct);
+        if (user == null)
         {
-            progression = new UserProgression
-            {
-                Id = userId,
-                Xp = 0,
-                Level = 0,
-                HasPremiumPass = false,
-                CurrentSeason = desiredSeason,
-                Dust = 0,
-                Crystals = 0,
-                Inventory = new List<string>()
-            };
-            await _db.UserProgressions.InsertOneAsync(progression, cancellationToken: ct);
-            return progression;
+            throw new InvalidOperationException($"User with ID {userId} not found");
         }
 
-        if (progression.CurrentSeason != desiredSeason)
+        var desiredSeason = _battlePassOptions.CurrentSeason;
+        bool needsUpdate = false;
+
+        if (user.CurrentSeason != desiredSeason)
         {
             // Reset seasonal progress but KEEP Dust, Crystals, and Inventory
-            progression.Xp = 0;
-            progression.Level = 0;
-            progression.HasPremiumPass = false;
-            progression.CurrentSeason = desiredSeason;
-            await _db.UserProgressions.ReplaceOneAsync(p => p.Id == userId, progression, cancellationToken: ct);
+            user.Xp = 0;
+            user.Level = 0;
+            user.HasPremiumPass = false;
+            user.CurrentSeason = desiredSeason;
+            needsUpdate = true;
         }
 
         // ensure level stays in sync even if XP changes via other routes
-        var expectedLevel = CalculateLevel(progression.Xp);
-        if (progression.Level != expectedLevel)
+        var expectedLevel = CalculateLevel(user.Xp);
+        if (user.Level != expectedLevel)
         {
-            progression.Level = expectedLevel;
-            await _db.UserProgressions.ReplaceOneAsync(p => p.Id == userId, progression, cancellationToken: ct);
+            user.Level = expectedLevel;
+            needsUpdate = true;
         }
 
-        return progression;
+        if (needsUpdate)
+        {
+            await _db.Users.ReplaceOneAsync(u => u.Id == userId, user, cancellationToken: ct);
+        }
+
+        return user;
     }
 }

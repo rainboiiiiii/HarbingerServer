@@ -62,7 +62,9 @@ public static class AccountEndpoints
             UsernameNormalized = normalizedUsername,
             PasswordHash = passwordService.HashPassword(request.Password),
             CreatedAt = DateTime.UtcNow,
-            LastLogin = DateTime.UtcNow
+            LastLogin = DateTime.UtcNow,
+            Dust = 1000,
+            Crystals = 100
         };
 
         try
