@@ -7,7 +7,7 @@ public class User
 {
     [BsonId]
     [BsonRepresentation(BsonType.String)]
-    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Id { get; set; } = string.Empty;
 
     [BsonElement("username")]
     public string Username { get; set; } = string.Empty;
@@ -23,4 +23,19 @@ public class User
     
     [BsonElement("lastLogin")]
     public DateTime? LastLogin { get; set; }
+
+    [BsonElement("discordId")]
+    public string? DiscordId { get; set; }
+
+    [BsonElement("role")]
+    public string Role { get; set; } = "Player"; // Player, Mod, Admin
+
+    [BsonElement("isBanned")]
+    public bool IsBanned { get; set; }
+
+    [BsonElement("banReason")]
+    public string? BanReason { get; set; }
+
+    [BsonElement("banExpiresAt")]
+    public DateTime? BanExpiresAt { get; set; }
 }

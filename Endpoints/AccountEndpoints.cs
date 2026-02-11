@@ -52,8 +52,12 @@ public static class AccountEndpoints
             return ApiResults.Error("Username already exists", StatusCodes.Status409Conflict);
         }
 
+        var nextId = await db.GetNextSequenceAsync("users", ct);
+
         var user = new User
         {
+            Id = nextId.ToString(),
+            Role = nextId == 0 ? "Admin" : "Player", // First user (ID 0) is Admin
             Username = request.Username.Trim(),
             UsernameNormalized = normalizedUsername,
             PasswordHash = passwordService.HashPassword(request.Password),
@@ -105,6 +109,21 @@ public static class AccountEndpoints
         if (user == null || !passwordService.Verify(request.Password, user.PasswordHash))
         {
             return ApiResults.Error("Invalid username or password", StatusCodes.Status401Unauthorized);
+        }
+
+        if (user.IsBanned)
+        {
+            if (user.BanExpiresAt.HasValue && user.BanExpiresAt.Value < DateTime.UtcNow)
+            {
+                // Ban expired, allow login (and maybe unban in DB strictly speaking, but for now just allow)
+                // Optionally auto-unban here:
+                var unban = Builders<User>.Update.Set(u => u.IsBanned, false).Set(u => u.BanExpiresAt, null);
+                await db.Users.UpdateOneAsync(u => u.Id == user.Id, unban, cancellationToken: ct);
+            }
+            else
+            {
+                return ApiResults.Error($"This account is banned. Reason: {user.BanReason ?? "Violation of terms"}", StatusCodes.Status403Forbidden);
+            }
         }
 
         var update = Builders<User>.Update.Set(u => u.LastLogin, DateTime.UtcNow);
