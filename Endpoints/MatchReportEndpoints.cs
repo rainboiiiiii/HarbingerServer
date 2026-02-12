@@ -70,7 +70,8 @@ public static class MatchReportEndpoints
 
     private static string GetUserId(HttpContext context)
     {
-        return context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ??
+        return context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+               context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ??
                context.User.Identity?.Name ??
                string.Empty;
     }
