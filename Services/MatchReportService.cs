@@ -49,13 +49,14 @@ public class MatchReportService
         foreach (var summary in request.PlayerSummaries)
         {
             var xpAward = CalculateXp(summary);
-            var progression = await _progressionService.AddXpAsync(summary.UserId, xpAward, ct);
+            var progression = await _progressionService.AddXpAsync(summary.UserId, xpAward, true, ct);
             awards.Add(new MatchAward
             {
                 UserId = summary.UserId,
                 XpAwarded = xpAward,
                 NewXp = progression.Xp,
-                NewLevel = progression.Level
+                NewLevel = progression.Level,
+                NewSeasonPassXp = progression.SeasonPassXp
             });
         }
 
@@ -104,4 +105,5 @@ public class MatchAward
     public long XpAwarded { get; set; }
     public long NewXp { get; set; }
     public int NewLevel { get; set; }
+    public long NewSeasonPassXp { get; set; }
 }

@@ -117,7 +117,7 @@ public static class ModerationEndpoints
 
         if (request.Dust > 0 || request.Crystals > 0)
         {
-            await progressionService.AddRewardsAsync(target.Id, 0, request.Dust, request.Crystals, ct);
+            await progressionService.AddRewardsAsync(target.Id, 0, request.Dust, request.Crystals, true, ct);
         }
 
         if (request.Items != null && request.Items.Any())

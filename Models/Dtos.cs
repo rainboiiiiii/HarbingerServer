@@ -24,6 +24,7 @@ public record ProgressionResponse(
 public class AddXpRequest
 {
     public long Xp { get; set; }
+    public bool ApplyToSeasonPass { get; set; } = true;
 }
 
 public class ClaimTierRequest

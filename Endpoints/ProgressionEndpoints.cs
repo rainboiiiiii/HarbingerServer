@@ -42,7 +42,7 @@ public static class ProgressionEndpoints
         }
 
         var userId = GetUserId(context);
-        var progression = await progressionService.AddXpAsync(userId, request.Xp, ct);
+        var progression = await progressionService.AddXpAsync(userId, request.Xp, request.ApplyToSeasonPass, ct);
         return ApiResults.Ok(progression);
     }
 

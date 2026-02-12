@@ -30,11 +30,20 @@ public class ProgressionService
         return await BuildResponseAsync(userId, user, ct);
     }
 
-    public async Task<ProgressionResponse> AddXpAsync(string userId, long xpToAdd, CancellationToken ct = default)
+    public async Task<ProgressionResponse> AddXpAsync(string userId, long xpToAdd, bool applyToSeasonPass = true, CancellationToken ct = default)
     {
         var user = await EnsureProgressionAsync(userId, ct);
+        
+        // Account XP is permanent
         user.Xp += xpToAdd;
         user.Level = CalculateLevel(user.Xp);
+
+        // Season Pass XP resets seasonally
+        if (applyToSeasonPass)
+        {
+            user.SeasonPassXp += xpToAdd;
+        }
+
         await _db.Users.ReplaceOneAsync(
             u => u.Id == userId,
             user,
@@ -44,11 +53,20 @@ public class ProgressionService
         return await BuildResponseAsync(userId, user, ct);
     }
 
-    public async Task<ProgressionResponse> AddRewardsAsync(string userId, long xpToAdd, int dustToAdd, int crystalsToAdd, CancellationToken ct = default)
+    public async Task<ProgressionResponse> AddRewardsAsync(string userId, long xpToAdd, int dustToAdd, int crystalsToAdd, bool applyToSeasonPass = true, CancellationToken ct = default)
     {
         var user = await EnsureProgressionAsync(userId, ct);
+        
+        // Account XP
         user.Xp += xpToAdd;
         user.Level = CalculateLevel(user.Xp);
+
+        // Season Pass XP
+        if (applyToSeasonPass)
+        {
+            user.SeasonPassXp += xpToAdd;
+        }
+
         user.Dust += dustToAdd;
         user.Crystals += crystalsToAdd;
 
@@ -208,9 +226,8 @@ public class ProgressionService
 
         if (user.CurrentSeason != desiredSeason)
         {
-            // Reset seasonal progress but KEEP Dust, Crystals, and Inventory
-            user.Xp = 0;
-            user.Level = 0;
+            // Reset SEASONAL progress (Season Pass)
+            // But KEEP Account XP and Account Level (Permanent)
             user.SeasonPassXp = 0;
             user.HasPremiumPass = false;
             user.CurrentSeason = desiredSeason;

@@ -43,7 +43,8 @@ public static class MatchReportEndpoints
                     userId = a.UserId,
                     xpAwarded = a.XpAwarded,
                     newXp = a.NewXp,
-                    newLevel = a.NewLevel
+                    newLevel = a.NewLevel,
+                    newSeasonPassXp = a.NewSeasonPassXp
                 }).ToArray()
             });
         }
