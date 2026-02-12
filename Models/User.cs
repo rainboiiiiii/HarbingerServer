@@ -64,6 +64,9 @@ public class User
     [BsonElement("seasonPassXp")]
     public long SeasonPassXp { get; set; }
 
+    [BsonElement("seasonPassLevel")]
+    public int SeasonPassLevel { get; set; }
+
     [BsonElement("lastClaimedAt")]
     public DateTime? LastClaimedAt { get; set; }
 }

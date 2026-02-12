@@ -84,8 +84,12 @@ public static class ProgressionEndpoints
 
             return ApiResults.Ok(response);
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
+            if (ex.Message.Contains("required"))
+            {
+                return ApiResults.Error(ex.Message, StatusCodes.Status403Forbidden);
+            }
             return ApiResults.Error("Premium pass required", StatusCodes.Status403Forbidden);
         }
     }

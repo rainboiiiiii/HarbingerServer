@@ -42,6 +42,7 @@ public class ProgressionService
         if (applyToSeasonPass)
         {
             user.SeasonPassXp += xpToAdd;
+            user.SeasonPassLevel = CalculateLevel(user.SeasonPassXp);
         }
 
         await _db.Users.ReplaceOneAsync(
@@ -65,6 +66,7 @@ public class ProgressionService
         if (applyToSeasonPass)
         {
             user.SeasonPassXp += xpToAdd;
+            user.SeasonPassLevel = CalculateLevel(user.SeasonPassXp);
         }
 
         user.Dust += dustToAdd;
@@ -153,9 +155,18 @@ public class ProgressionService
     public async Task<(ProgressionResponse response, bool duplicate)> ClaimTierAsync(string userId, int tierIndex, bool isPremium, CancellationToken ct = default)
     {
         var user = await EnsureProgressionAsync(userId, ct);
+
+        // Requirement 1: Premium Pass check
         if (isPremium && !user.HasPremiumPass)
         {
             throw new InvalidOperationException("Premium pass not unlocked");
+        }
+
+        // Requirement 2: Season Pass Level check (Tier index starts at 0, so Tier 1 is index 0)
+        // Level 1 allows claiming Tier 1 (index 0), Level 2 allows Tier 2 (index 1), etc.
+        if (user.SeasonPassLevel < (tierIndex + 1))
+        {
+            throw new InvalidOperationException($"Season Pass Level {tierIndex + 1} required to claim this tier");
         }
 
         var claim = new UserBattlePassClaim
@@ -200,7 +211,8 @@ public class ProgressionService
             user.Dust,
             user.Crystals,
             user.Inventory,
-            user.SeasonPassXp);
+            user.SeasonPassXp,
+            user.SeasonPassLevel);
     }
 
     private int CalculateLevel(long xp)
@@ -229,16 +241,24 @@ public class ProgressionService
             // Reset SEASONAL progress (Season Pass)
             // But KEEP Account XP and Account Level (Permanent)
             user.SeasonPassXp = 0;
+            user.SeasonPassLevel = 0;
             user.HasPremiumPass = false;
             user.CurrentSeason = desiredSeason;
             needsUpdate = true;
         }
 
-        // ensure level stays in sync even if XP changes via other routes
+        // ensure levels stay in sync even if XP changes via other routes
         var expectedLevel = CalculateLevel(user.Xp);
         if (user.Level != expectedLevel)
         {
             user.Level = expectedLevel;
+            needsUpdate = true;
+        }
+
+        var expectedPassLevel = CalculateLevel(user.SeasonPassXp);
+        if (user.SeasonPassLevel != expectedPassLevel)
+        {
+            user.SeasonPassLevel = expectedPassLevel;
             needsUpdate = true;
         }
 

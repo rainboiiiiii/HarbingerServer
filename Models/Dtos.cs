@@ -19,7 +19,8 @@ public record ProgressionResponse(
     int Dust,
     int Crystals,
     List<string> Inventory,
-    long SeasonPassXp = 0);
+    long SeasonPassXp = 0,
+    int SeasonPassLevel = 0);
 
 public class AddXpRequest
 {
