@@ -1,5 +1,6 @@
 using GameBackend.Api.Data;
 using GameBackend.Api.Models;
+using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
 namespace GameBackend.Api.Services;
@@ -8,12 +9,18 @@ public class MatchReportService
 {
     private readonly MongoDbContext _db;
     private readonly ProgressionService _progressionService;
+    private readonly ProgressionOptions _progressionOptions;
     private readonly ILogger<MatchReportService> _logger;
 
-    public MatchReportService(MongoDbContext db, ProgressionService progressionService, ILogger<MatchReportService> logger)
+    public MatchReportService(
+        MongoDbContext db, 
+        ProgressionService progressionService, 
+        IOptions<ProgressionOptions> progressionOptions,
+        ILogger<MatchReportService> logger)
     {
         _db = db;
         _progressionService = progressionService;
+        _progressionOptions = progressionOptions.Value;
         _logger = logger;
     }
 
@@ -48,14 +55,19 @@ public class MatchReportService
         var awards = new List<MatchAward>();
         foreach (var summary in request.PlayerSummaries)
         {
-            var xpAward = CalculateXp(summary);
-            var progression = await _progressionService.AddXpAsync(summary.UserId, xpAward, true, ct);
+            var (xpAward, dustAward, crystalsAward) = CalculateRewards(summary);
+            var progression = await _progressionService.AddRewardsAsync(summary.UserId, xpAward, dustAward, crystalsAward, true, ct);
+            
             awards.Add(new MatchAward
             {
                 UserId = summary.UserId,
                 XpAwarded = xpAward,
+                DustAwarded = dustAward,
+                CrystalsAwarded = crystalsAward,
                 NewXp = progression.Xp,
                 NewLevel = progression.Level,
+                NewDust = progression.Dust,
+                NewCrystals = progression.Crystals,
                 NewSeasonPassXp = progression.SeasonPassXp
             });
         }
@@ -92,10 +104,23 @@ public class MatchReportService
         }
     }
 
-    private static long CalculateXp(PlayerSummary summary)
+    private (long xp, int dust, int crystals) CalculateRewards(PlayerSummary summary)
     {
-        var xp = summary.WavesCleared * 100L + summary.Kills * 2L;
-        return Math.Min(xp, 50_000);
+        var scaling = _progressionOptions.RewardScaling;
+
+        // Calculate XP
+        var xp = (summary.WavesCleared * scaling.XpPerWave) + (summary.Kills * scaling.XpPerKill);
+        xp = Math.Min(xp, scaling.MaxXpPerMatch);
+
+        // Calculate Dust
+        var dust = summary.WavesCleared * scaling.DustPerWave;
+        dust = Math.Min(dust, scaling.MaxDustPerMatch);
+
+        // Calculate Crystals
+        var crystals = summary.WavesCleared * scaling.CrystalsPerWave;
+        crystals = Math.Min(crystals, scaling.MaxCrystalsPerMatch);
+
+        return (xp, dust, crystals);
     }
 }
 
@@ -103,7 +128,11 @@ public class MatchAward
 {
     public string UserId { get; set; } = string.Empty;
     public long XpAwarded { get; set; }
+    public int DustAwarded { get; set; }
+    public int CrystalsAwarded { get; set; }
     public long NewXp { get; set; }
     public int NewLevel { get; set; }
+    public int NewDust { get; set; }
+    public int NewCrystals { get; set; }
     public long NewSeasonPassXp { get; set; }
 }

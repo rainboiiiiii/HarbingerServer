@@ -64,7 +64,8 @@ public static class AccountEndpoints
             CreatedAt = DateTime.UtcNow,
             LastLogin = DateTime.UtcNow,
             Dust = 1000,
-            Crystals = 100
+            Crystals = 100,
+            Level = 1
         };
 
         try

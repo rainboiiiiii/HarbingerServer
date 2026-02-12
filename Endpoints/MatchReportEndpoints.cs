@@ -42,8 +42,12 @@ public static class MatchReportEndpoints
                 {
                     userId = a.UserId,
                     xpAwarded = a.XpAwarded,
+                    dustAwarded = a.DustAwarded,
+                    crystalsAwarded = a.CrystalsAwarded,
                     newXp = a.NewXp,
                     newLevel = a.NewLevel,
+                    newDust = a.NewDust,
+                    newCrystals = a.NewCrystals,
                     newSeasonPassXp = a.NewSeasonPassXp
                 }).ToArray()
             });

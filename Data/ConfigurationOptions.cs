@@ -17,6 +17,18 @@ public class JwtOptions
 public class ProgressionOptions
 {
     public int XpPerLevel { get; set; } = 1000;
+    public RewardScalingOptions RewardScaling { get; set; } = new();
+}
+
+public class RewardScalingOptions
+{
+    public long XpPerWave { get; set; } = 100;
+    public long XpPerKill { get; set; } = 2;
+    public int DustPerWave { get; set; } = 50;
+    public int CrystalsPerWave { get; set; } = 5;
+    public long MaxXpPerMatch { get; set; } = 50000;
+    public int MaxDustPerMatch { get; set; } = 5000;
+    public int MaxCrystalsPerMatch { get; set; } = 500;
 }
 
 public class BattlePassOptions
