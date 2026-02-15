@@ -10,17 +10,20 @@ public class ProgressionService
     private readonly MongoDbContext _db;
     private readonly ProgressionOptions _progressionOptions;
     private readonly BattlePassOptions _battlePassOptions;
+    private readonly EconomyOptions _economyOptions;
     private readonly ILogger<ProgressionService> _logger;
 
     public ProgressionService(
         MongoDbContext db,
         IOptions<ProgressionOptions> progressionOptions,
         IOptions<BattlePassOptions> battlePassOptions,
+        IOptions<EconomyOptions> economyOptions,
         ILogger<ProgressionService> logger)
     {
         _db = db;
         _progressionOptions = progressionOptions.Value;
         _battlePassOptions = battlePassOptions.Value;
+        _economyOptions = economyOptions.Value;
         _logger = logger;
     }
 
@@ -30,19 +33,19 @@ public class ProgressionService
         return await BuildResponseAsync(userId, user, ct);
     }
 
-    public async Task<ProgressionResponse> AddXpAsync(string userId, long xpToAdd, bool applyToSeasonPass = true, CancellationToken ct = default)
+    public async Task<ProgressionResponse> AddXpAsync(string userId, long accountXpToAdd, long seasonPassXpToAdd = 0, CancellationToken ct = default)
     {
         var user = await EnsureProgressionAsync(userId, ct);
         
         // Account XP is permanent
-        user.Xp += xpToAdd;
-        user.Level = CalculateLevel(user.Xp);
+        user.Xp += accountXpToAdd;
+        user.Level = CalculateAccountLevel(user.Xp);
 
-        // Season Pass XP resets seasonally
-        if (applyToSeasonPass)
+        // Season Pass XP
+        if (seasonPassXpToAdd > 0)
         {
-            user.SeasonPassXp += xpToAdd;
-            user.SeasonPassLevel = CalculateLevel(user.SeasonPassXp);
+            user.SeasonPassXp += seasonPassXpToAdd;
+            user.SeasonPassLevel = CalculateSeasonPassLevel(user.SeasonPassXp);
         }
 
         await _db.Users.ReplaceOneAsync(
@@ -54,20 +57,17 @@ public class ProgressionService
         return await BuildResponseAsync(userId, user, ct);
     }
 
-    public async Task<ProgressionResponse> AddRewardsAsync(string userId, long xpToAdd, int dustToAdd, int crystalsToAdd, bool applyToSeasonPass = true, CancellationToken ct = default)
+    public async Task<ProgressionResponse> AddRewardsAsync(string userId, long accountXpToAdd, long seasonPassXpToAdd, int dustToAdd, int crystalsToAdd, CancellationToken ct = default)
     {
         var user = await EnsureProgressionAsync(userId, ct);
         
         // Account XP
-        user.Xp += xpToAdd;
-        user.Level = CalculateLevel(user.Xp);
+        user.Xp += accountXpToAdd;
+        user.Level = CalculateAccountLevel(user.Xp);
 
         // Season Pass XP
-        if (applyToSeasonPass)
-        {
-            user.SeasonPassXp += xpToAdd;
-            user.SeasonPassLevel = CalculateLevel(user.SeasonPassXp);
-        }
+        user.SeasonPassXp += seasonPassXpToAdd;
+        user.SeasonPassLevel = CalculateSeasonPassLevel(user.SeasonPassXp);
 
         user.Dust += dustToAdd;
         user.Crystals += crystalsToAdd;
@@ -81,59 +81,76 @@ public class ProgressionService
         return await BuildResponseAsync(userId, user, ct);
     }
 
-    public async Task<ProgressionResponse> GrantItemsAsync(string userId, List<string> items, CancellationToken ct = default)
+    public async Task<ProgressionResponse> GrantItemsAsync(string userId, List<string> itemIds, int quantity = 1, CancellationToken ct = default)
     {
         var user = await EnsureProgressionAsync(userId, ct);
-        bool changed = false;
-        foreach (var item in items)
+        
+        foreach (var itemId in itemIds)
         {
-            if (!user.Inventory.Contains(item))
-            {
-                user.Inventory.Add(item);
-                changed = true;
-            }
+            AddItemToInventory(user, itemId, quantity);
         }
 
-        if (changed)
-        {
-            await _db.Users.ReplaceOneAsync(u => u.Id == userId, user, new ReplaceOptions { IsUpsert = true }, ct);
-        }
-
+        await _db.Users.ReplaceOneAsync(u => u.Id == userId, user, new ReplaceOptions { IsUpsert = true }, ct);
         return await BuildResponseAsync(userId, user, ct);
     }
 
-    public async Task<ProgressionResponse> PurchaseItemAsync(string userId, string itemId, string currencyType, int cost, CancellationToken ct = default)
+    public async Task<ProgressionResponse> GrantWeaponsAsync(string userId, List<string> weaponIds, CancellationToken ct = default)
+    {
+        var user = await EnsureProgressionAsync(userId, ct);
+        
+        foreach (var weaponId in weaponIds)
+        {
+            AddWeaponToOwned(user, weaponId);
+        }
+
+        await _db.Users.ReplaceOneAsync(u => u.Id == userId, user, new ReplaceOptions { IsUpsert = true }, ct);
+        return await BuildResponseAsync(userId, user, ct);
+    }
+
+    public async Task<bool> VerifyWeaponOwnershipAsync(string userId, string weaponId, CancellationToken ct = default)
+    {
+        var user = await EnsureProgressionAsync(userId, ct);
+        return user.OwnedWeapons.Contains(weaponId);
+    }
+
+    public async Task<ProgressionResponse> PurchaseItemAsync(string userId, string itemId, string currencyType, int clientCost, int quantity = 1, CancellationToken ct = default)
     {
         var user = await EnsureProgressionAsync(userId, ct);
 
-        // If already owned, don't charge, just return current state
-        if (user.Inventory.Contains(itemId))
+        // Server-side cost verification
+        var itemPrice = _economyOptions.ItemPrices.FirstOrDefault(p => 
+            string.Equals(p.ItemId, itemId, StringComparison.OrdinalIgnoreCase) && 
+            string.Equals(p.Currency, currencyType, StringComparison.OrdinalIgnoreCase));
+
+        if (itemPrice == null)
         {
-            return await BuildResponseAsync(userId, user, ct);
+            throw new InvalidOperationException($"Item '{itemId}' is not available for purchase with '{currencyType}'");
         }
+
+        int totalCost = itemPrice.Cost * quantity;
 
         if (string.Equals(currencyType, "Dust", StringComparison.OrdinalIgnoreCase))
         {
-            if (user.Dust < cost)
+            if (user.Dust < totalCost)
             {
                 throw new InvalidOperationException("Not enough dust");
             }
-            user.Dust -= cost;
+            user.Dust -= totalCost;
         }
         else if (string.Equals(currencyType, "Crystals", StringComparison.OrdinalIgnoreCase))
         {
-            if (user.Crystals < cost)
+            if (user.Crystals < totalCost)
             {
                 throw new InvalidOperationException("Not enough crystals");
             }
-            user.Crystals -= cost;
+            user.Crystals -= totalCost;
         }
         else
         {
             throw new ArgumentException($"Invalid currency type: {currencyType}");
         }
 
-        user.Inventory.Add(itemId);
+        AddItemToInventory(user, itemId, quantity);
 
         await _db.Users.ReplaceOneAsync(
             u => u.Id == userId,
@@ -142,6 +159,64 @@ public class ProgressionService
             ct);
 
         return await BuildResponseAsync(userId, user, ct);
+    }
+
+    private void AddItemToInventory(User user, string itemId, int quantity)
+    {
+        // REQUIREMENT: Check against ItemRegistry to prevent spawning invalid items
+        var itemDef = _economyOptions.ItemRegistry.FirstOrDefault(i => 
+            string.Equals(i.ItemId, itemId, StringComparison.OrdinalIgnoreCase));
+
+        if (itemDef == null)
+        {
+            _logger.LogWarning("Attempted to add invalid item ID: {ItemId} to user {UserId}", itemId, user.Id);
+            throw new InvalidOperationException($"Item '{itemId}' does not exist in the game database.");
+        }
+
+        int maxStack = itemDef.MaxStack;
+
+        // Find existing stacks of this item that aren't full
+        var existingStack = user.Inventory.FirstOrDefault(i => i.ItemId == itemId && i.Quantity < maxStack);
+
+        if (existingStack != null)
+        {
+            int spaceInStack = maxStack - existingStack.Quantity;
+            int amountToAdd = Math.Min(quantity, spaceInStack);
+            
+            existingStack.Quantity += amountToAdd;
+            quantity -= amountToAdd;
+        }
+
+        // If there's still quantity left to add (or no existing stack found)
+        while (quantity > 0)
+        {
+            int amountToAdd = Math.Min(quantity, maxStack);
+            user.Inventory.Add(new InventoryItem
+            {
+                ItemId = itemId,
+                Quantity = amountToAdd,
+                AcquiredAt = DateTime.UtcNow
+            });
+            quantity -= amountToAdd;
+        }
+    }
+
+    private void AddWeaponToOwned(User user, string weaponId)
+    {
+        // REQUIREMENT: Check against WeaponRegistry to prevent spawning invalid weapons
+        var weaponDef = _economyOptions.WeaponRegistry.FirstOrDefault(w => 
+            string.Equals(w.WeaponId, weaponId, StringComparison.OrdinalIgnoreCase));
+
+        if (weaponDef == null)
+        {
+            _logger.LogWarning("Attempted to grant invalid weapon ID: {WeaponId} to user {UserId}", weaponId, user.Id);
+            throw new InvalidOperationException($"Weapon '{weaponId}' does not exist in the game database.");
+        }
+
+        if (!user.OwnedWeapons.Contains(weaponId))
+        {
+            user.OwnedWeapons.Add(weaponId);
+        }
     }
 
     public async Task<ProgressionResponse> UnlockBattlePassAsync(string userId, CancellationToken ct = default)
@@ -181,6 +256,34 @@ public class ProgressionService
         try
         {
             await _db.UserBattlePassClaims.InsertOneAsync(claim, cancellationToken: ct);
+
+            // Grant Reward
+            var tierDef = _battlePassOptions.Tiers.FirstOrDefault(t => t.TierIndex == tierIndex);
+            if (tierDef != null)
+            {
+                var reward = isPremium ? tierDef.PremiumReward : tierDef.FreeReward;
+                if (reward != null)
+                {
+                    switch (reward.Type.ToLower())
+                    {
+                        case "dust":
+                            user.Dust += reward.Amount;
+                            break;
+                        case "crystals":
+                            user.Crystals += reward.Amount;
+                            break;
+                        case "item":
+                            if (!string.IsNullOrEmpty(reward.ItemId))
+                            {
+                                AddItemToInventory(user, reward.ItemId, reward.Amount);
+                            }
+                            break;
+                    }
+
+                    // Save the user state with the new rewards
+                    await _db.Users.ReplaceOneAsync(u => u.Id == userId, user, new ReplaceOptions { IsUpsert = true }, ct);
+                }
+            }
         }
         catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
         {
@@ -203,7 +306,7 @@ public class ProgressionService
         return new ProgressionResponse(
             userId,
             user.Xp,
-            CalculateLevel(user.Xp),
+            CalculateAccountLevel(user.Xp),
             user.HasPremiumPass,
             user.CurrentSeason,
             claimedFree,
@@ -211,18 +314,21 @@ public class ProgressionService
             user.Dust,
             user.Crystals,
             user.Inventory,
+            user.OwnedWeapons,
             user.SeasonPassXp,
-            user.SeasonPassLevel);
+            CalculateSeasonPassLevel(user.SeasonPassXp));
     }
 
-    private int CalculateLevel(long xp)
+    private int CalculateAccountLevel(long xp)
     {
-        if (_progressionOptions.XpPerLevel <= 0)
-        {
-            return 0;
-        }
+        if (_progressionOptions.AccountXpPerLevel <= 0) return 0;
+        return (int)Math.Floor(xp / (double)_progressionOptions.AccountXpPerLevel);
+    }
 
-        return (int)Math.Floor(xp / (double)_progressionOptions.XpPerLevel);
+    private int CalculateSeasonPassLevel(long xp)
+    {
+        if (_progressionOptions.SeasonPassXpPerLevel <= 0) return 0;
+        return (int)Math.Floor(xp / (double)_progressionOptions.SeasonPassXpPerLevel);
     }
 
     private async Task<User> EnsureProgressionAsync(string userId, CancellationToken ct)
@@ -248,14 +354,14 @@ public class ProgressionService
         }
 
         // ensure levels stay in sync even if XP changes via other routes
-        var expectedLevel = CalculateLevel(user.Xp);
+        var expectedLevel = CalculateAccountLevel(user.Xp);
         if (user.Level != expectedLevel)
         {
             user.Level = expectedLevel;
             needsUpdate = true;
         }
 
-        var expectedPassLevel = CalculateLevel(user.SeasonPassXp);
+        var expectedPassLevel = CalculateSeasonPassLevel(user.SeasonPassXp);
         if (user.SeasonPassLevel != expectedPassLevel)
         {
             user.SeasonPassLevel = expectedPassLevel;

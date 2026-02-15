@@ -15,6 +15,9 @@ public class Match
     [BsonElement("region")]
     public string Region { get; set; } = string.Empty;
 
+    [BsonElement("map")]
+    public string Map { get; set; } = string.Empty;
+
     [BsonElement("state")]
     public string State { get; set; } = "active";
 

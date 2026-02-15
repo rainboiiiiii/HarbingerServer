@@ -6,7 +6,7 @@ public record LoginRequest(string Username, string Password);
 
 public record AuthResponse(string UserId, string Username, string Token, DateTime ExpiresAt);
 
-public record MeResponse(string Id, string Username, DateTime ExpiresAt, int Dust, int Crystals, List<string> Inventory, ProgressionResponse Progression);
+public record MeResponse(string Id, string Username, DateTime ExpiresAt, int Dust, int Crystals, List<InventoryItem> Inventory, List<string> OwnedWeapons, ProgressionResponse Progression);
 
 public record ProgressionResponse(
     string UserId,
@@ -18,14 +18,15 @@ public record ProgressionResponse(
     IReadOnlyCollection<int> ClaimedPremiumTiers,
     int Dust,
     int Crystals,
-    List<string> Inventory,
+    List<InventoryItem> Inventory,
+    List<string> OwnedWeapons,
     long SeasonPassXp = 0,
     int SeasonPassLevel = 0);
 
 public class AddXpRequest
 {
-    public long Xp { get; set; }
-    public bool ApplyToSeasonPass { get; set; } = true;
+    public long AccountXp { get; set; }
+    public long SeasonPassXp { get; set; }
 }
 
 public class ClaimTierRequest
@@ -61,6 +62,7 @@ public class MatchInfo
     public string MatchId { get; set; } = string.Empty;
     public string Mode { get; set; } = string.Empty;
     public string Region { get; set; } = string.Empty;
+    public string Map { get; set; } = string.Empty;
     public IReadOnlyCollection<string> Players { get; set; } = Array.Empty<string>();
     public DateTime CreatedAt { get; set; }
     public string State { get; set; } = string.Empty;
@@ -70,6 +72,7 @@ public class MatchReportRequest
 {
     public string MatchId { get; set; } = string.Empty;
     public string? LobbyId { get; set; }
+    public string Map { get; set; } = string.Empty;
     public string HostId { get; set; } = string.Empty;
     public List<PlayerSummary> PlayerSummaries { get; set; } = new();
 }
@@ -87,6 +90,7 @@ public class PurchaseRequest
     public string ItemId { get; set; } = string.Empty;
     public string Currency { get; set; } = "Dust";
     public int Cost { get; set; }
+    public int Quantity { get; set; } = 1;
 }
 
 public class MatchReportResponse
@@ -98,11 +102,14 @@ public class MatchReportResponse
 public class MatchAwardResponse
 {
     public string UserId { get; set; } = string.Empty;
-    public long XpAwarded { get; set; }
+    public long AccountXpAwarded { get; set; }
+    public long SeasonPassXpAwarded { get; set; }
     public int DustAwarded { get; set; }
     public int CrystalsAwarded { get; set; }
     public long NewXp { get; set; }
     public int NewLevel { get; set; }
     public int NewDust { get; set; }
     public int NewCrystals { get; set; }
+    public long NewSeasonPassXp { get; set; }
+    public int NewSeasonPassLevel { get; set; }
 }

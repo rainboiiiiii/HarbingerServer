@@ -26,7 +26,7 @@ public static class InventoryEndpoints
 
         try
         {
-            var response = await progressionService.PurchaseItemAsync(userId, request.ItemId, request.Currency, request.Cost, ct);
+            var response = await progressionService.PurchaseItemAsync(userId, request.ItemId, request.Currency, request.Cost, request.Quantity, ct);
             return ApiResults.Ok(response);
         }
         catch (InvalidOperationException ex)

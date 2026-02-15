@@ -167,6 +167,7 @@ public static class AccountEndpoints
             progression.Dust,
             progression.Crystals,
             progression.Inventory,
+            progression.OwnedWeapons,
             progression
         ));
     }

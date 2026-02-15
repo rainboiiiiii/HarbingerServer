@@ -17,6 +17,7 @@ builder.Services.Configure<BattlePassOptions>(builder.Configuration.GetSection("
 builder.Services.Configure<MatchmakingOptions>(builder.Configuration.GetSection("Matchmaking"));
 builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection("Cors"));
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection("Admin"));
+builder.Services.Configure<EconomyOptions>(builder.Configuration.GetSection("Economy"));
 
 builder.Services.Configure<JsonOptions>(options =>
 {

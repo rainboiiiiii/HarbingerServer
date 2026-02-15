@@ -62,7 +62,7 @@ public static class DiscordEndpoints
             return Results.NotFound(new { message = "User not found with this Discord ID" });
         }
 
-        await progressionService.AddRewardsAsync(user.Id, 0, request.Dust, request.Crystals, true, ct);
+        await progressionService.AddRewardsAsync(user.Id, 0, 0, request.Dust, request.Crystals, ct);
 
         // Get updated progression
         var progression = await progressionService.GetProgressionAsync(user.Id, ct);

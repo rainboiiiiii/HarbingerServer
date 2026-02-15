@@ -55,28 +55,36 @@ public class MatchReportService
         var awards = new List<MatchAward>();
         foreach (var summary in request.PlayerSummaries)
         {
-            var (xpAward, dustAward, crystalsAward) = CalculateRewards(summary);
-            var progression = await _progressionService.AddRewardsAsync(summary.UserId, xpAward, dustAward, crystalsAward, true, ct);
+            var (accountXp, seasonPassXp, dustAward, crystalsAward) = CalculateRewards(summary);
+            var progression = await _progressionService.AddRewardsAsync(summary.UserId, accountXp, seasonPassXp, dustAward, crystalsAward, ct);
             
             awards.Add(new MatchAward
             {
                 UserId = summary.UserId,
-                XpAwarded = xpAward,
+                AccountXpAwarded = accountXp,
+                SeasonPassXpAwarded = seasonPassXp,
                 DustAwarded = dustAward,
                 CrystalsAwarded = crystalsAward,
                 NewXp = progression.Xp,
                 NewLevel = progression.Level,
                 NewDust = progression.Dust,
                 NewCrystals = progression.Crystals,
-                NewSeasonPassXp = progression.SeasonPassXp
+                NewSeasonPassXp = progression.SeasonPassXp,
+                NewSeasonPassLevel = progression.SeasonPassLevel
             });
         }
 
         // Optional match state update to reflect reporting
         try
         {
-            var update = Builders<Match>.Update.Set(m => m.State, "reported");
-            await _db.Matches.UpdateOneAsync(m => m.Id == match.Id, update, cancellationToken: ct);
+            var updateBuilder = Builders<Match>.Update.Set(m => m.State, "reported");
+            
+            if (!string.IsNullOrEmpty(request.Map))
+            {
+                updateBuilder = updateBuilder.Set(m => m.Map, request.Map);
+            }
+
+            await _db.Matches.UpdateOneAsync(m => m.Id == match.Id, updateBuilder, cancellationToken: ct);
         }
         catch (Exception ex)
         {
@@ -104,13 +112,16 @@ public class MatchReportService
         }
     }
 
-    private (long xp, int dust, int crystals) CalculateRewards(PlayerSummary summary)
+    private (long accountXp, long seasonPassXp, int dust, int crystals) CalculateRewards(PlayerSummary summary)
     {
         var scaling = _progressionOptions.RewardScaling;
 
-        // Calculate XP
-        var xp = (summary.WavesCleared * scaling.XpPerWave) + (summary.Kills * scaling.XpPerKill);
-        xp = Math.Min(xp, scaling.MaxXpPerMatch);
+        // Calculate Account XP
+        var accountXp = (summary.WavesCleared * scaling.XpPerWave) + (summary.Kills * scaling.XpPerKill);
+        accountXp = Math.Min(accountXp, scaling.MaxXpPerMatch);
+
+        // Calculate Season Pass XP (For now, same as Account XP, but can be scaled differently)
+        var seasonPassXp = accountXp; 
 
         // Calculate Dust
         var dust = summary.WavesCleared * scaling.DustPerWave;
@@ -120,14 +131,15 @@ public class MatchReportService
         var crystals = summary.WavesCleared * scaling.CrystalsPerWave;
         crystals = Math.Min(crystals, scaling.MaxCrystalsPerMatch);
 
-        return (xp, dust, crystals);
+        return (accountXp, seasonPassXp, dust, crystals);
     }
 }
 
 public class MatchAward
 {
     public string UserId { get; set; } = string.Empty;
-    public long XpAwarded { get; set; }
+    public long AccountXpAwarded { get; set; }
+    public long SeasonPassXpAwarded { get; set; }
     public int DustAwarded { get; set; }
     public int CrystalsAwarded { get; set; }
     public long NewXp { get; set; }
@@ -135,4 +147,5 @@ public class MatchAward
     public int NewDust { get; set; }
     public int NewCrystals { get; set; }
     public long NewSeasonPassXp { get; set; }
+    public int NewSeasonPassLevel { get; set; }
 }

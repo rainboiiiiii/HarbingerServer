@@ -53,7 +53,10 @@ public class User
     public int Crystals { get; set; }
 
     [BsonElement("inventory")]
-    public List<string> Inventory { get; set; } = new();
+    public List<InventoryItem> Inventory { get; set; } = new();
+
+    [BsonElement("ownedWeapons")]
+    public List<string> OwnedWeapons { get; set; } = new();
 
     [BsonElement("hasPremiumPass")]
     public bool HasPremiumPass { get; set; }
@@ -69,4 +72,16 @@ public class User
 
     [BsonElement("lastClaimedAt")]
     public DateTime? LastClaimedAt { get; set; }
+}
+
+public class InventoryItem
+{
+    [BsonElement("itemId")]
+    public string ItemId { get; set; } = string.Empty;
+
+    [BsonElement("quantity")]
+    public int Quantity { get; set; } = 1;
+
+    [BsonElement("acquiredAt")]
+    public DateTime AcquiredAt { get; set; } = DateTime.UtcNow;
 }

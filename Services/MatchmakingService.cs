@@ -128,6 +128,7 @@ public class MatchmakingService
             MatchId = match.Id,
             Mode = match.Mode,
             Region = match.Region,
+            Map = match.Map,
             Players = match.Players,
             CreatedAt = match.CreatedAt,
             State = match.State
@@ -158,12 +159,17 @@ public class MatchmakingService
                 return;
             }
 
+            var map = _options.AvailableMaps.Count > 0 
+                ? _options.AvailableMaps[Random.Shared.Next(_options.AvailableMaps.Count)] 
+                : "Outer Edge";
+
             var matchId = Guid.NewGuid().ToString();
             var match = new Match
             {
                 Id = matchId,
                 Mode = mode,
                 Region = region,
+                Map = map,
                 State = "matched",
                 CreatedAt = DateTime.UtcNow,
                 Players = candidates.Select(c => c.UserId).ToList()
@@ -220,11 +226,16 @@ public class MatchmakingService
         var updateResult = await _db.QueueTickets.UpdateManyAsync(atomicFilter, update, cancellationToken: ct);
         if (updateResult.ModifiedCount == playersPerMatch)
         {
+            var map = _options.AvailableMaps.Count > 0 
+                ? _options.AvailableMaps[Random.Shared.Next(_options.AvailableMaps.Count)] 
+                : "Outer Edge";
+
             var match = new Match
             {
                 Id = matchId,
                 Mode = mode,
                 Region = region,
+                Map = map,
                 State = "matched",
                 CreatedAt = DateTime.UtcNow,
                 Players = candidates.Select(c => c.UserId).ToList()

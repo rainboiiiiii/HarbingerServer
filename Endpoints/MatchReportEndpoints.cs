@@ -41,14 +41,16 @@ public static class MatchReportEndpoints
                 awards = awards.Select(a => new
                 {
                     userId = a.UserId,
-                    xpAwarded = a.XpAwarded,
+                    accountXpAwarded = a.AccountXpAwarded,
+                    seasonPassXpAwarded = a.SeasonPassXpAwarded,
                     dustAwarded = a.DustAwarded,
                     crystalsAwarded = a.CrystalsAwarded,
                     newXp = a.NewXp,
                     newLevel = a.NewLevel,
                     newDust = a.NewDust,
                     newCrystals = a.NewCrystals,
-                    newSeasonPassXp = a.NewSeasonPassXp
+                    newSeasonPassXp = a.NewSeasonPassXp,
+                    newSeasonPassLevel = a.NewSeasonPassLevel
                 }).ToArray()
             });
         }

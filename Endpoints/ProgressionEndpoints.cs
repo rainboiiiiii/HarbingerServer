@@ -18,6 +18,24 @@ public static class ProgressionEndpoints
         group.MapPost("/addxp", AddXpAsync).WithOpenApi();
         group.MapPost("/unlock-battlepass", UnlockAsync).WithOpenApi();
         group.MapPost("/claim", ClaimAsync).WithOpenApi();
+        group.MapGet("/weapons", GetWeaponRegistry).AllowAnonymous().WithOpenApi();
+        group.MapGet("/weapons/verify/{weaponId}", VerifyWeaponAsync).WithOpenApi();
+    }
+
+    private static IResult GetWeaponRegistry(IOptions<EconomyOptions> economyOptions)
+    {
+        return ApiResults.Ok(economyOptions.Value.WeaponRegistry);
+    }
+
+    private static async Task<IResult> VerifyWeaponAsync(
+        string weaponId,
+        HttpContext context,
+        ProgressionService progressionService,
+        CancellationToken ct)
+    {
+        var userId = GetUserId(context);
+        var owned = await progressionService.VerifyWeaponOwnershipAsync(userId, weaponId, ct);
+        return ApiResults.Ok(new { weaponId, owned });
     }
 
     private static async Task<IResult> GetProgressionAsync(
@@ -36,13 +54,13 @@ public static class ProgressionEndpoints
         ProgressionService progressionService,
         CancellationToken ct)
     {
-        if (request is null || request.Xp <= 0 || request.Xp > 1_000_000)
+        if (request is null)
         {
-            return ApiResults.Error("xp must be between 1 and 1000000", StatusCodes.Status400BadRequest);
+            return ApiResults.Error("Invalid request", StatusCodes.Status400BadRequest);
         }
 
         var userId = GetUserId(context);
-        var progression = await progressionService.AddXpAsync(userId, request.Xp, request.ApplyToSeasonPass, ct);
+        var progression = await progressionService.AddXpAsync(userId, request.AccountXp, request.SeasonPassXp, ct);
         return ApiResults.Ok(progression);
     }
 

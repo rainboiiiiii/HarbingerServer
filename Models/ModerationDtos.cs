@@ -19,7 +19,9 @@ public class GrantItemsRequest
     public int Dust { get; set; }
     public int Crystals { get; set; }
     public List<string> Items { get; set; } = new();
+    public List<string> Weapons { get; set; } = new();
     public bool UnlockBattlePass { get; set; }
+    public int Quantity { get; set; } = 1;
 }
 
 public class PromoteUserRequest

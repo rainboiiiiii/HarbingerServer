@@ -117,12 +117,17 @@ public static class ModerationEndpoints
 
         if (request.Dust > 0 || request.Crystals > 0)
         {
-            await progressionService.AddRewardsAsync(target.Id, 0, request.Dust, request.Crystals, true, ct);
+            await progressionService.AddRewardsAsync(target.Id, 0, 0, request.Dust, request.Crystals, ct);
         }
 
         if (request.Items != null && request.Items.Any())
         {
-            await progressionService.GrantItemsAsync(target.Id, request.Items, ct);
+            await progressionService.GrantItemsAsync(target.Id, request.Items, request.Quantity, ct);
+        }
+
+        if (request.Weapons != null && request.Weapons.Any())
+        {
+            await progressionService.GrantWeaponsAsync(target.Id, request.Weapons, ct);
         }
 
         if (request.UnlockBattlePass)
