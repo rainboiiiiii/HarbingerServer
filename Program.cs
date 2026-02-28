@@ -18,6 +18,7 @@ builder.Services.Configure<MatchmakingOptions>(builder.Configuration.GetSection(
 builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection("Cors"));
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection("Admin"));
 builder.Services.Configure<EconomyOptions>(builder.Configuration.GetSection("Economy"));
+builder.Services.Configure<GameServerOptions>(builder.Configuration.GetSection("GameServer"));
 
 builder.Services.Configure<JsonOptions>(options =>
 {
@@ -29,8 +30,10 @@ builder.Services.AddSingleton<PasswordService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton<LoginRateLimiter>();
 builder.Services.AddSingleton<ProgressionService>();
+builder.Services.AddHttpClient<UnityMatchmakingService>();
 builder.Services.AddSingleton<MatchmakingService>();
 builder.Services.AddSingleton<MatchReportService>();
+builder.Services.AddSingleton<GameServerService>();
 
 builder.Services.AddCors(options =>
 {

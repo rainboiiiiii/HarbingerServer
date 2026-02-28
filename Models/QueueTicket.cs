@@ -29,4 +29,13 @@ public class QueueTicket
 
     [BsonElement("matchId")]
     public string? MatchId { get; set; }
+
+    [BsonElement("unityTicketId")]
+    public string? UnityTicketId { get; set; }
+
+    [BsonElement("equippedWeapons")]
+    public List<string> EquippedWeapons { get; set; } = new();
+
+    [BsonElement("equippedAbilities")]
+    public List<string> EquippedAbilities { get; set; } = new();
 }

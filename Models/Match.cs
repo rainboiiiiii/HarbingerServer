@@ -26,4 +26,32 @@ public class Match
 
     [BsonElement("players")]
     public List<string> Players { get; set; } = new();
+
+    [BsonElement("serverIp")]
+    public string? ServerIp { get; set; }
+
+    [BsonElement("serverPort")]
+    public int? ServerPort { get; set; }
+
+    // Unity Matchmaking related fields
+    [BsonElement("generatorName")]
+    public string? GeneratorName { get; set; }
+
+    [BsonElement("queueName")]
+    public string? QueueName { get; set; }
+
+    [BsonElement("poolName")]
+    public string? PoolName { get; set; }
+
+    [BsonElement("environmentId")]
+    public string? EnvironmentId { get; set; }
+
+    [BsonElement("backfillTicketId")]
+    public string? BackfillTicketId { get; set; }
+
+    [BsonElement("poolId")]
+    public string? PoolId { get; set; }
+
+    [BsonElement("matchProperties")]
+    public Dictionary<string, object>? MatchProperties { get; set; }
 }

@@ -40,6 +40,8 @@ public class EnqueueRequest
     public string Mode { get; set; } = string.Empty;
     public string Region { get; set; } = string.Empty;
     public int PlayersPerMatch { get; set; } = 4;
+    public List<string> EquippedWeapons { get; set; } = new();
+    public List<string> EquippedAbilities { get; set; } = new();
 }
 
 public class MatchStatusResponse
@@ -66,6 +68,8 @@ public class MatchInfo
     public IReadOnlyCollection<string> Players { get; set; } = Array.Empty<string>();
     public DateTime CreatedAt { get; set; }
     public string State { get; set; } = string.Empty;
+    public string? ServerIp { get; set; }
+    public int? ServerPort { get; set; }
 }
 
 public class MatchReportRequest

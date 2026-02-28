@@ -11,17 +11,20 @@ public class MatchReportService
     private readonly ProgressionService _progressionService;
     private readonly ProgressionOptions _progressionOptions;
     private readonly ILogger<MatchReportService> _logger;
+    private readonly GameServerService _gameServerService;
 
     public MatchReportService(
         MongoDbContext db, 
         ProgressionService progressionService, 
         IOptions<ProgressionOptions> progressionOptions,
-        ILogger<MatchReportService> logger)
+        ILogger<MatchReportService> logger,
+        GameServerService gameServerService)
     {
         _db = db;
         _progressionService = progressionService;
         _progressionOptions = progressionOptions.Value;
         _logger = logger;
+        _gameServerService = gameServerService;
     }
 
     public async Task<(Match match, List<MatchAward> awards)> ReportMatchAsync(string callerUserId, MatchReportRequest request, CancellationToken ct = default)
@@ -85,6 +88,8 @@ public class MatchReportService
             }
 
             await _db.Matches.UpdateOneAsync(m => m.Id == match.Id, updateBuilder, cancellationToken: ct);
+            // Shut down the simulated game server
+            await _gameServerService.ShutdownServerAsync(match.Id);
         }
         catch (Exception ex)
         {

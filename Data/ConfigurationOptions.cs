@@ -97,3 +97,17 @@ public class AdminOptions
 {
     public string ApiKey { get; set; } = string.Empty;
 }
+
+public class GameServerOptions
+{
+    public string ExecutablePath { get; set; } = string.Empty;
+    public string WorkingDirectory { get; set; } = string.Empty;
+    public string UnityExecutableName { get; set; } = "UnityHeadlessServer";
+}
+
+public class UnityMatchmakingOptions
+{
+    public string BaseUrl { get; set; } = string.Empty;
+    public string ProjectId { get; set; } = string.Empty;
+    public string ServiceAccountKey { get; set; } = string.Empty;
+}
