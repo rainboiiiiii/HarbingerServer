@@ -54,7 +54,7 @@ public class MatchmakingService
         string unityTicketId;
         try
         {
-            unityTicketId = await _unityMatchmakingService.CreateTicketAsync("default", unityAttributes, unityPlayers);
+            unityTicketId = await _unityMatchmakingService.CreateTicketAsync("OuterEdge", unityAttributes, unityPlayers);
             _logger.LogInformation("Unity matchmaking ticket {UnityTicketId} created for user {UserId}.", unityTicketId, userId);
         }
         catch (Exception ex)

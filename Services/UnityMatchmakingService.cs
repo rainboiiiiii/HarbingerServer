@@ -3,9 +3,10 @@ using GameBackend.Api.Data;
 using GameBackend.Api.Models;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using System.Text;
 
 namespace GameBackend.Api.Services;
+
 public class UnityMatchmakingService
 {
     private readonly HttpClient _httpClient;
@@ -19,7 +20,11 @@ public class UnityMatchmakingService
         _options = options.Value;
         _logger = logger;
         _authService = authService;
-        _httpClient.BaseAddress = new Uri(_options.BaseUrl);
+
+        // Ensure BaseAddress is set to the root (e.g., https://matchmaker.services.api.unity.com)
+        _httpClient.BaseAddress = new Uri(_options.BaseUrl.TrimEnd('/') + "/");
+
+        // This header is required for all Unity Service calls
         _httpClient.DefaultRequestHeaders.Add("X-Unity-Services-Project-Id", _options.ProjectId);
     }
 
@@ -33,29 +38,30 @@ public class UnityMatchmakingService
         };
 
         var json = JsonConvert.SerializeObject(requestBody);
-        var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
 
+        // Get fresh token from our working AuthService
         string accessToken = await _authService.GetAccessTokenAsync();
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        _logger.LogInformation("Sending CreateTicket request to Unity Matchmaking API: {RequestUri}", _httpClient.BaseAddress + "/tickets");
-        _logger.LogDebug("CreateTicket Request Body: {RequestBody}", json);
+        // FIX 1: Use 'v2/tickets' (no leading slash) to avoid the double-slash // bug
+        // FIX 2: Unity current standard is the v2 endpoint
+        const string endpoint = "v2/tickets";
 
-        var response = await _httpClient.PostAsync("/tickets", content);
+        _logger.LogInformation("Creating Unity ticket. Queue: {Queue}, URL: {FullUri}", queueName, _httpClient.BaseAddress + endpoint);
+
+        var response = await _httpClient.PostAsync(endpoint, content);
+        var responseContent = await response.Content.ReadAsStringAsync();
 
         if (response.IsSuccessStatusCode)
         {
-            var responseContent = await response.Content.ReadAsStringAsync();
             var ticketResponse = JsonConvert.DeserializeObject<UnityMatchmakingTicketResponse>(responseContent);
-            _logger.LogInformation("Successfully created Unity matchmaking ticket: {TicketId}", ticketResponse?.Id);
-            return ticketResponse?.Id ?? throw new InvalidOperationException("Unity Matchmaking ticket ID was null.");
+            _logger.LogInformation("Successfully created ticket: {TicketId}", ticketResponse?.Id);
+            return ticketResponse?.Id ?? throw new Exception("Ticket ID missing from response.");
         }
-        else
-        {
-            var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("Failed to create Unity matchmaking ticket. Status: {StatusCode}, Content: {ErrorContent}", response.StatusCode, errorContent);
-            throw new HttpRequestException($"Failed to create Unity matchmaking ticket: {response.StatusCode} - {errorContent}");
-        }
+
+        _logger.LogError("Failed to create ticket. Status: {Status}, Error: {Error}", response.StatusCode, responseContent);
+        throw new HttpRequestException($"Unity Matchmaking Error: {response.StatusCode} - {responseContent}");
     }
 
     public async Task DeleteTicketAsync(string ticketId)
@@ -63,17 +69,14 @@ public class UnityMatchmakingService
         string accessToken = await _authService.GetAccessTokenAsync();
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        _logger.LogInformation("Sending DeleteTicket request to Unity Matchmaking API for ticket {TicketId}", ticketId);
-        var response = await _httpClient.DeleteAsync($"/tickets/{ticketId}");
+        // Remove leading slash to prevent //tickets
+        var response = await _httpClient.DeleteAsync($"v2/tickets/{ticketId}");
 
         if (!response.IsSuccessStatusCode)
         {
-            var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("Failed to delete Unity matchmaking ticket {TicketId}. Status: {StatusCode}, Content: {ErrorContent}", ticketId, response.StatusCode, errorContent);
-            throw new HttpRequestException($"Failed to delete Unity matchmaking ticket: {response.StatusCode} - {errorContent}");
+            var error = await response.Content.ReadAsStringAsync();
+            _logger.LogError("Failed to delete ticket {Id}: {Error}", ticketId, error);
         }
-
-        _logger.LogInformation("Successfully deleted Unity matchmaking ticket: {TicketId}", ticketId);
     }
 
     public async Task<UnityMatchmakingTicketStatusResponse> GetTicketStatusAsync(string ticketId)
@@ -81,22 +84,16 @@ public class UnityMatchmakingService
         string accessToken = await _authService.GetAccessTokenAsync();
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        _logger.LogInformation("Sending GetTicketStatus request to Unity Matchmaking API for ticket {TicketId}", ticketId);
-        var response = await _httpClient.GetAsync($"/tickets/{ticketId}/status");
+        // Use v2 and remove leading slash
+        var response = await _httpClient.GetAsync($"v2/tickets/{ticketId}/status");
+        var content = await response.Content.ReadAsStringAsync();
 
         if (response.IsSuccessStatusCode)
         {
-            var responseContent = await response.Content.ReadAsStringAsync();
-            var statusResponse = JsonConvert.DeserializeObject<UnityMatchmakingTicketStatusResponse>(responseContent);
-            _logger.LogInformation("Successfully retrieved Unity matchmaking ticket status for {TicketId}. Status: {Status}", ticketId, statusResponse?.Status);
-            return statusResponse ?? throw new InvalidOperationException("Unity Matchmaking ticket status response was null.");
+            return JsonConvert.DeserializeObject<UnityMatchmakingTicketStatusResponse>(content)!;
         }
-        else
-        {
-            var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("Failed to get Unity matchmaking ticket status for {TicketId}. Status: {StatusCode}, Content: {ErrorContent}", ticketId, response.StatusCode, errorContent);
-            throw new HttpRequestException($"Failed to get Unity matchmaking ticket status: {response.StatusCode} - {errorContent}");
-        }
+
+        throw new HttpRequestException($"Failed to get status for {ticketId}: {content}");
     }
 
     public async Task<UnityMatchmakingResultsResponse> GetMatchmakingResultsAsync(string matchId)
@@ -104,21 +101,19 @@ public class UnityMatchmakingService
         string accessToken = await _authService.GetAccessTokenAsync();
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        _logger.LogInformation("Sending GetMatchmakingResults request to Unity Matchmaking API for match {MatchId}", matchId);
-        var response = await _httpClient.GetAsync($"/projects/{_options.ProjectId}/matches/{matchId}/matchmaking-results");
+        // Note: The results endpoint usually requires the project ID in the path
+        var endpoint = $"v2/projects/{_options.ProjectId}/matches/{matchId}/matchmaking-results";
+
+        _logger.LogInformation("Fetching match results from: {Endpoint}", endpoint);
+        var response = await _httpClient.GetAsync(endpoint);
+        var content = await response.Content.ReadAsStringAsync();
 
         if (response.IsSuccessStatusCode)
         {
-            var responseContent = await response.Content.ReadAsStringAsync();
-            var resultsResponse = JsonConvert.DeserializeObject<UnityMatchmakingResultsResponse>(responseContent);
-            _logger.LogInformation("Successfully retrieved Unity matchmaking results for match {MatchId}", matchId);
-            return resultsResponse ?? throw new InvalidOperationException("Unity Matchmaking results response was null.");
+            return JsonConvert.DeserializeObject<UnityMatchmakingResultsResponse>(content)
+                   ?? throw new Exception("Matchmaking results were empty.");
         }
-        else
-        {
-            var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("Failed to get Unity matchmaking results for match {MatchId}. Status: {StatusCode}, Content: {ErrorContent}", matchId, response.StatusCode, errorContent);
-            throw new HttpRequestException($"Failed to get Unity matchmaking results: {response.StatusCode} - {errorContent}");
-        }
+
+        throw new HttpRequestException($"Failed to get match results: {response.StatusCode} - {content}");
     }
 }
