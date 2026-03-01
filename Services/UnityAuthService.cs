@@ -1,82 +1,59 @@
 using System.Net.Http.Headers;
-using System.Text.Json;
 using System.Text;
+using System.Text.Json;
 
 public class UnityAuthService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<UnityAuthService> _logger;
-
     private string? _accessToken;
-    private DateTime _expiresAtUtc;
 
-    // Hard-coded credentials - Double check these for leading/trailing spaces!
-    private const string ClientId = "46987a59-021a-45e8-969c-b03301fcf496";
-    private const string ClientSecret = "xNLAX9zCmR79abJgVsMweQm226_YtVHG";
+    // 1. MUST BE THE 'KEY ID' from image_6dd884.png (starting with 4698...)
+    private const string ClientId = "2725d93b-a83d-45ff-bb47-0fbbd9d324a5";
+
+    // 2. MUST BE THE 'SECRET' shown only ONCE when you created the key above
+    private const string ClientSecret = "Gsgx6hddm6Da6mtw-5PkUgvJbffWH23o";
+
+    // 3. MUST BE THE 'PROJECT ID' from Project Settings > General
     private const string ProjectId = "3f735ce7-0797-4b51-98c9-e7abfcb3b585";
-    private const string TokenUrl = "https://services.api.unity.com/auth/v1/token-exchange";
 
     public UnityAuthService(HttpClient httpClient, ILogger<UnityAuthService> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
-
-        if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
-        {
-            _httpClient.DefaultRequestHeaders.Add("User-Agent", "UnityGameBackend-Harbinger");
-        }
     }
 
     public async Task<string> GetAccessTokenAsync()
     {
-        if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _expiresAtUtc)
-        {
-            return _accessToken;
-        }
+        if (!string.IsNullOrEmpty(_accessToken)) return _accessToken;
 
-        _logger.LogInformation("Requesting Unity Services token exchange for Project: {ProjectId}", ProjectId);
+        _logger.LogInformation("Attempting token exchange...");
 
-        // Ensure ProjectId is used in the query string
-        var requestUrl = $"{TokenUrl}?projectId={ProjectId.Trim()}";
-        var request = new HttpRequestMessage(HttpMethod.Post, requestUrl);
+        // Project ID is required in the URL
+        var url = $"https://services.api.unity.com/auth/v1/token-exchange?projectId={ProjectId}";
 
-        // 1. Properly format Basic Auth
-        // Unity docs recommend UTF8 for the Base64 conversion
-        var rawCredentials = $"{ClientId.Trim()}:{ClientSecret.Trim()}";
-        var authHeaderValue = Convert.ToBase64String(Encoding.UTF8.GetBytes(rawCredentials));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", authHeaderValue);
+        var request = new HttpRequestMessage(HttpMethod.Post, url);
 
-        // 2. Body - The API expects a JSON object. 
-        // Providing scopes as p:projectId is the standard for service-to-service auth.
-        var body = new
-        {
-            scopes = new[] { $"p:{ProjectId.Trim()}" }
-        };
+        // Basic Auth: base64(ClientId:ClientSecret)
+        var authBytes = Encoding.UTF8.GetBytes($"{ClientId}:{ClientSecret}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
 
-        var jsonPayload = JsonSerializer.Serialize(body);
-        request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+        // Sending an empty JSON object {} is the simplest valid body
+        request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
 
         var response = await _httpClient.SendAsync(request);
-        var responseContent = await response.Content.ReadAsStringAsync();
+        var body = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
         {
-            // Log the Request ID if available to help Unity Support if needed
-            _logger.LogError("Unity Auth Failed. Status: {Status}, Content: {Content}", response.StatusCode, responseContent);
-            throw new Exception($"Unity Authentication Failed (401). Check if the Key is Active in the Dashboard.");
+            _logger.LogError("Auth Failed: {Body}", body);
+            throw new Exception("Unity rejected the Key ID or Secret.");
         }
 
-        var tokenResponse = JsonSerializer.Deserialize<UnityTokenResponse>(responseContent);
+        // Quick manual parse to avoid deserialization issues
+        using var doc = JsonDocument.Parse(body);
+        _accessToken = doc.RootElement.GetProperty("accessToken").GetString();
 
-        _accessToken = tokenResponse?.accessToken;
-        _expiresAtUtc = DateTime.UtcNow.AddMinutes(50); // Refresh slightly before 1 hour expiry
-
-        _logger.LogInformation("Successfully obtained Unity Services token.");
-        return _accessToken ?? throw new Exception("Token was null in successful response.");
-    }
-
-    private class UnityTokenResponse
-    {
-        public string accessToken { get; set; } = default!;
+        return _accessToken!;
     }
 }
