@@ -19,6 +19,8 @@ public class UnityAuthService
         _httpClient = httpClient;
         _config = config;
         _logger = logger;
+
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", "UnityGameBackend-Harbinger");
     }
 
     public async Task<string> GetAccessTokenAsync()
@@ -33,7 +35,7 @@ public class UnityAuthService
 
     var request = new HttpRequestMessage(
         HttpMethod.Post,
-        "https://api.unity.com/v1/oauth2/token");
+        _config["UnityAuth:TokenUrl"]);
 
     // Create Basic auth header
     var clientId = _config["UnityAuth:ClientId"]!;
@@ -46,7 +48,8 @@ public class UnityAuthService
 
     request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
     {
-        { "grant_type", "client_credentials" }
+        { "grant_type", "client_credentials" },
+        { "scope", $"project:{"3f735ce7-0797-4b51-98c9-e7abfcb3b585"}" } // Add this line
     });
 
     var response = await _httpClient.SendAsync(request);
