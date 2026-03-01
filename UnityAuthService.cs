@@ -10,15 +10,13 @@ public class UnityAuthService
     private string? _accessToken;
     private DateTime _expiresAtUtc;
 
-    // Hard-coded credentials
+    // Hard-coded credentials - Double check these for leading/trailing spaces!
     private const string ClientId = "d04df0da-5968-459d-aa33-3946402f637d";
     private const string ClientSecret = "KzYQh8nvk5LjYqKxurPi9lgSDqC-JAJU";
     private const string ProjectId = "3f735ce7-0797-4b51-98c9-e7abfcb3b585";
     private const string TokenUrl = "https://services.api.unity.com/auth/v1/token-exchange";
 
-    public UnityAuthService(
-        HttpClient httpClient,
-        ILogger<UnityAuthService> logger)
+    public UnityAuthService(HttpClient httpClient, ILogger<UnityAuthService> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
@@ -36,46 +34,45 @@ public class UnityAuthService
             return _accessToken;
         }
 
-        _logger.LogInformation("Requesting Unity Services token exchange...");
+        _logger.LogInformation("Requesting Unity Services token exchange for Project: {ProjectId}", ProjectId);
 
-        // ProjectId MUST be a query parameter
-        var requestUrl = $"{TokenUrl}?projectId={ProjectId}";
+        // Ensure ProjectId is used in the query string
+        var requestUrl = $"{TokenUrl}?projectId={ProjectId.Trim()}";
         var request = new HttpRequestMessage(HttpMethod.Post, requestUrl);
 
-        // Fixed the casing here to match the 'private const' above
-        var authString = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{ClientId}:{ClientSecret}"));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", authString);
+        // 1. Properly format Basic Auth
+        // Unity docs recommend UTF8 for the Base64 conversion
+        var rawCredentials = $"{ClientId.Trim()}:{ClientSecret.Trim()}";
+        var authHeaderValue = Convert.ToBase64String(Encoding.UTF8.GetBytes(rawCredentials));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", authHeaderValue);
 
+        // 2. Body - The API expects a JSON object. 
+        // Providing scopes as p:projectId is the standard for service-to-service auth.
         var body = new
         {
-            scopes = new[] { $"p:{ProjectId}" }
+            scopes = new[] { $"p:{ProjectId.Trim()}" }
         };
 
         var jsonPayload = JsonSerializer.Serialize(body);
         request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
         var response = await _httpClient.SendAsync(request);
-        var responseBody = await response.Content.ReadAsStringAsync();
+        var responseContent = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogError("Unity Token Exchange failed: {Status} {Body}", response.StatusCode, responseBody);
-            throw new Exception($"Failed to authenticate with Unity Services. Status: {response.StatusCode}");
+            // Log the Request ID if available to help Unity Support if needed
+            _logger.LogError("Unity Auth Failed. Status: {Status}, Content: {Content}", response.StatusCode, responseContent);
+            throw new Exception($"Unity Authentication Failed (401). Check if the Key is Active in the Dashboard.");
         }
 
-        var tokenResponse = JsonSerializer.Deserialize<UnityTokenResponse>(responseBody);
+        var tokenResponse = JsonSerializer.Deserialize<UnityTokenResponse>(responseContent);
 
-        if (tokenResponse == null || string.IsNullOrEmpty(tokenResponse.accessToken))
-        {
-            throw new Exception("Unity returned an empty or invalid token response.");
-        }
-
-        _accessToken = tokenResponse.accessToken;
-        _expiresAtUtc = DateTime.UtcNow.AddMinutes(55);
+        _accessToken = tokenResponse?.accessToken;
+        _expiresAtUtc = DateTime.UtcNow.AddMinutes(50); // Refresh slightly before 1 hour expiry
 
         _logger.LogInformation("Successfully obtained Unity Services token.");
-
-        return _accessToken;
+        return _accessToken ?? throw new Exception("Token was null in successful response.");
     }
 
     private class UnityTokenResponse
