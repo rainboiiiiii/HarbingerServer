@@ -11,8 +11,8 @@ public class UnityAuthService
     private DateTime _expiresAtUtc;
 
     // Hard-coded credentials - Double check these for leading/trailing spaces!
-    private const string ClientId = "d04df0da-5968-459d-aa33-3946402f637d";
-    private const string ClientSecret = "KzYQh8nvk5LjYqKxurPi9lgSDqC-JAJU";
+    private const string ClientId = "46987a59-021a-45e8-969c-b03301fcf496";
+    private const string ClientSecret = "xNLAX9zCmR79abJgVsMweQm226_YtVHG";
     private const string ProjectId = "3f735ce7-0797-4b51-98c9-e7abfcb3b585";
     private const string TokenUrl = "https://services.api.unity.com/auth/v1/token-exchange";
 
