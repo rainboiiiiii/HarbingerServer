@@ -106,8 +106,15 @@ public class GameServerOptions
 }
 
 public class UnityMatchmakingOptions
-{
-    public string BaseUrl { get; set; } = string.Empty;
-    public string ProjectId { get; set; } = string.Empty;
-    public string ServiceAccountKey { get; set; } = string.Empty;
-}
+    {
+        public string BaseUrl { get; set; } = string.Empty;
+        public string ProjectId { get; set; } = string.Empty;
+        public string ServiceAccountKey { get; set; } = string.Empty;
+    }
+
+    public class UnityAuthOptions
+    {
+        public string TokenUrl { get; set; } = string.Empty;
+        public string ClientId { get; set; } = string.Empty;
+        public string ClientSecret { get; set; } = string.Empty;
+    }

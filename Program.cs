@@ -20,6 +20,8 @@ builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection("Admin
 builder.Services.Configure<EconomyOptions>(builder.Configuration.GetSection("Economy"));
 builder.Services.Configure<GameServerOptions>(builder.Configuration.GetSection("GameServer"));
 builder.Services.Configure<UnityMatchmakingOptions>(builder.Configuration.GetSection("UnityMatchmaking"));
+builder.Services.Configure<UnityAuthOptions>(builder.Configuration.GetSection("UnityAuth"));
+builder.Services.AddHttpClient<UnityAuthService>();
 
 builder.Services.Configure<JsonOptions>(options =>
 {

@@ -1,23 +1,25 @@
+using System.Net.Http.Headers;
 using GameBackend.Api.Data;
 using GameBackend.Api.Models;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace GameBackend.Api.Services;
-
 public class UnityMatchmakingService
 {
     private readonly HttpClient _httpClient;
     private readonly UnityMatchmakingOptions _options;
     private readonly ILogger<UnityMatchmakingService> _logger;
+    private readonly UnityAuthService _authService;
 
-    public UnityMatchmakingService(HttpClient httpClient, IOptions<UnityMatchmakingOptions> options, ILogger<UnityMatchmakingService> logger)
+    public UnityMatchmakingService(HttpClient httpClient, IOptions<UnityMatchmakingOptions> options, ILogger<UnityMatchmakingService> logger, UnityAuthService authService)
     {
         _httpClient = httpClient;
         _options = options.Value;
         _logger = logger;
+        _authService = authService;
         _httpClient.BaseAddress = new Uri(_options.BaseUrl);
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_options.ServiceAccountKey}");
         _httpClient.DefaultRequestHeaders.Add("X-Unity-Services-Project-Id", _options.ProjectId);
     }
 
@@ -32,6 +34,9 @@ public class UnityMatchmakingService
 
         var json = JsonConvert.SerializeObject(requestBody);
         var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+        string accessToken = await _authService.GetAccessTokenAsync();
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         _logger.LogInformation("Sending CreateTicket request to Unity Matchmaking API: {RequestUri}", _httpClient.BaseAddress + "/tickets");
         _logger.LogDebug("CreateTicket Request Body: {RequestBody}", json);
@@ -55,8 +60,11 @@ public class UnityMatchmakingService
 
     public async Task DeleteTicketAsync(string ticketId)
     {
-        _logger.LogInformation("Sending DeleteTicket request to Unity Matchmaking API for ticket: {TicketId}", ticketId);
-        var response = await _httpClient.DeleteAsync($"/tickets?id={ticketId}");
+        string accessToken = await _authService.GetAccessTokenAsync();
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        _logger.LogInformation("Sending DeleteTicket request to Unity Matchmaking API for ticket {TicketId}", ticketId);
+        var response = await _httpClient.DeleteAsync($"/tickets/{ticketId}");
 
         if (!response.IsSuccessStatusCode)
         {
@@ -70,7 +78,10 @@ public class UnityMatchmakingService
 
     public async Task<UnityMatchmakingTicketStatusResponse> GetTicketStatusAsync(string ticketId)
     {
-        _logger.LogInformation("Sending GetTicketStatus request to Unity Matchmaking API for ticket: {TicketId}", ticketId);
+        string accessToken = await _authService.GetAccessTokenAsync();
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        _logger.LogInformation("Sending GetTicketStatus request to Unity Matchmaking API for ticket {TicketId}", ticketId);
         var response = await _httpClient.GetAsync($"/tickets/{ticketId}/status");
 
         if (response.IsSuccessStatusCode)
@@ -90,7 +101,10 @@ public class UnityMatchmakingService
 
     public async Task<UnityMatchmakingResultsResponse> GetMatchmakingResultsAsync(string matchId)
     {
-        _logger.LogInformation("Sending GetMatchmakingResults request to Unity Matchmaking API for project {ProjectId} and match {MatchId}", _options.ProjectId, matchId);
+        string accessToken = await _authService.GetAccessTokenAsync();
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        _logger.LogInformation("Sending GetMatchmakingResults request to Unity Matchmaking API for match {MatchId}", matchId);
         var response = await _httpClient.GetAsync($"/projects/{_options.ProjectId}/matches/{matchId}/matchmaking-results");
 
         if (response.IsSuccessStatusCode)
