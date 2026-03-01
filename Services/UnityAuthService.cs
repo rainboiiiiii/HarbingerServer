@@ -33,7 +33,7 @@ public class UnityAuthService
 
     var request = new HttpRequestMessage(
         HttpMethod.Post,
-        "https://api.unity.com/v1/oauth2/token");
+        "https://services.api.unity.com/auth/v1/token");
 
     // Create Basic auth header
     var clientId = _config["UnityAuth:ClientId"]!;
