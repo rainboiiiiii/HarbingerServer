@@ -32,50 +32,38 @@ public class UnityMatchmakingService
 
     public async Task<string> CreateTicketAsync(string queueName, Dictionary<string, object> attributes, List<UnityMatchmakingPlayer> players)
     {
-        // 1. Refresh Auth Token
         string accessToken = await _authService.GetAccessTokenAsync();
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
-        // 2. Set Impersonation Header (Required for Backend-to-Backend Service Accounts)
+        // 1. Ensure the impersonation header is present
         var firstPlayerId = players.FirstOrDefault()?.Id ?? "unknown";
         _httpClient.DefaultRequestHeaders.Remove("impersonated-user-id");
         _httpClient.DefaultRequestHeaders.Add("impersonated-user-id", firstPlayerId);
 
-        // 3. Construct the Payload
-        // We use a simplified player object to avoid property-validation errors
+        // 2. Use a BARE anonymous object. 
+        // Do NOT include 'attributes' or 'customData' if they are empty.
         var requestBody = new
         {
             queueName = queueName,
-            attributes = attributes ?? new Dictionary<string, object>(),
-            players = players.Select(p => new {
-                id = p.Id,
-                customData = new Dictionary<string, object>() // Use 'customData' instead of 'properties'
-            }).ToList()
+            players = players.Select(p => new { id = p.Id }).ToList()
         };
 
         var json = JsonConvert.SerializeObject(requestBody);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        _logger.LogInformation("Attempting Ticket Creation for Queue: {Queue}. Body: {Json}", queueName, json);
+        _logger.LogInformation("Sending Bare Ticket: {Json}", json);
 
-        // 4. Send Request
         var response = await _httpClient.PostAsync("v2/tickets", content);
         var responseContent = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogError("Unity Error 55 (InvalidRequest). Response: {Error}", responseContent);
+            _logger.LogError("Unity Error 55 Detail: {Error}", responseContent);
             throw new HttpRequestException($"Unity Matchmaking Error: {response.StatusCode} - {responseContent}");
         }
 
         var ticketResponse = JsonConvert.DeserializeObject<UnityMatchmakingTicketResponse>(responseContent);
-
-        if (ticketResponse == null || string.IsNullOrEmpty(ticketResponse.Id))
-        {
-            throw new Exception("Unity returned a success code but the Ticket ID was null or empty.");
-        }
-
-        return ticketResponse.Id;
+        return ticketResponse?.Id;
     }
 
     public async Task DeleteTicketAsync(string ticketId)
