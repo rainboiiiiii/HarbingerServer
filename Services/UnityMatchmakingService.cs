@@ -21,11 +21,13 @@ public class UnityMatchmakingService
         _logger = logger;
         _authService = authService;
 
-        // Ensure BaseAddress is set to the root (e.g., https://matchmaker.services.api.unity.com)
         _httpClient.BaseAddress = new Uri(_options.BaseUrl.TrimEnd('/') + "/");
 
-        // This header is required for all Unity Service calls
+        // Required Headers
         _httpClient.DefaultRequestHeaders.Add("X-Unity-Services-Project-Id", _options.ProjectId);
+
+        // Use the ID from your screenshot image_5deb29.png
+        _httpClient.DefaultRequestHeaders.Add("Unity-Environment", "12cb99a8-fc59-4778-8128-e19c6538ebb2");
     }
 
     public async Task<string> CreateTicketAsync(string queueName, Dictionary<string, object> attributes, List<UnityMatchmakingPlayer> players)
