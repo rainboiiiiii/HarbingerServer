@@ -14,8 +14,10 @@ public class UnityIdentityService
         _httpClient = httpClient;
         _authService = authService;
         _logger = logger;
-        _projectId = config["Unity:ProjectId"] ?? "";
-        // Note: Using the base address for the Identity Admin API
+
+        // Hardcoding for immediate testing
+        _projectId = "3f735ce7-0797-4b51-98c9-e7abfcb3b585";
+
         _httpClient.BaseAddress = new Uri("https://services.api.unity.com/auth/v1/");
     }
 
@@ -34,7 +36,7 @@ public class UnityIdentityService
             var payload = new { externalId = localUserId };
             var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync($"projects/{_projectId}/players", content);
+            var response = await _httpClient.PostAsync("projects/3f735ce7-0797-4b51-98c9-e7abfcb3b585/players", content);
             var responseContent = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
