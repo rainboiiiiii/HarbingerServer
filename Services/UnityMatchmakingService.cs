@@ -30,25 +30,42 @@ public class UnityMatchmakingService
 
     public async Task<string> CreateTicketAsync(string queueName, Dictionary<string, object> attributes, List<UnityMatchmakingPlayer> players)
     {
-        var requestBody = new UnityMatchmakingTicketRequest
+        // 1. Ensure attributes use numbers compatible with Unity (doubles)
+        var formattedAttributes = new Dictionary<string, object>();
+        foreach (var attr in attributes)
         {
-            QueueName = queueName,
-            Attributes = attributes,
-            Players = players
+            // Unity often fails if it sees an 'int' instead of a 'double' 
+            // in the JSON for matchmaking logic.
+            if (attr.Value is int intVal)
+                formattedAttributes[attr.Key] = (double)intVal;
+            else
+                formattedAttributes[attr.Key] = attr.Value;
+        }
+
+        // 2. Format the players list to match the v2 expected schema
+        // Most v2 implementations expect: { "id": "...", "properties": {} }
+        var formattedPlayers = players.Select(p => new {
+            id = p.Id,
+            properties = new Dictionary<string, object>() // Required even if empty
+        }).ToList();
+
+        var requestBody = new
+        {
+            queueName = queueName,
+            attributes = formattedAttributes,
+            players = formattedPlayers
         };
 
         var json = JsonConvert.SerializeObject(requestBody);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        // Get fresh token from our working AuthService
         string accessToken = await _authService.GetAccessTokenAsync();
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        // FIX 1: Use 'v2/tickets' (no leading slash) to avoid the double-slash // bug
-        // FIX 2: Unity current standard is the v2 endpoint
         const string endpoint = "v2/tickets";
 
-        _logger.LogInformation("Creating Unity ticket. Queue: {Queue}, URL: {FullUri}", queueName, _httpClient.BaseAddress + endpoint);
+        // Log the JSON body so you can see exactly what is being sent
+        _logger.LogInformation("Sending Ticket Body: {Json}", json);
 
         var response = await _httpClient.PostAsync(endpoint, content);
         var responseContent = await response.Content.ReadAsStringAsync();
@@ -56,11 +73,10 @@ public class UnityMatchmakingService
         if (response.IsSuccessStatusCode)
         {
             var ticketResponse = JsonConvert.DeserializeObject<UnityMatchmakingTicketResponse>(responseContent);
-            _logger.LogInformation("Successfully created ticket: {TicketId}", ticketResponse?.Id);
-            return ticketResponse?.Id ?? throw new Exception("Ticket ID missing from response.");
+            return ticketResponse?.Id ?? throw new Exception("Ticket ID missing.");
         }
 
-        _logger.LogError("Failed to create ticket. Status: {Status}, Error: {Error}", response.StatusCode, responseContent);
+        _logger.LogError("Unity Error 55 Detail: {Error}", responseContent);
         throw new HttpRequestException($"Unity Matchmaking Error: {response.StatusCode} - {responseContent}");
     }
 
