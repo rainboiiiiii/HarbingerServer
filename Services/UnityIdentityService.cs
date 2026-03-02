@@ -31,7 +31,7 @@ public class UnityIdentityService
             // REQUIRED: Specify the environment (Production vs Development)
             // Without this, Unity doesn't know where to "create" the player
             _httpClient.DefaultRequestHeaders.Remove("Unity-Environment");
-            _httpClient.DefaultRequestHeaders.Add("Unity-Environment", "production");
+            _httpClient.DefaultRequestHeaders.Add("Unity-Environment", "12cb99a8-fc59-4778-8128-e19c6538ebb2");
 
             var payload = new { externalId = localUserId };
             var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
