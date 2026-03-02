@@ -36,7 +36,7 @@ public class UnityIdentityService
             var payload = new { externalId = localUserId };
             var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("projects/3f735ce7-0797-4b51-98c9-e7abfcb3b585/players", content);
+            var response = await _httpClient.PostAsync("projects/3f735ce7-0797-4b51-98c9-e7abfcb3b585/external-identity/sign-up", content);
             var responseContent = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
