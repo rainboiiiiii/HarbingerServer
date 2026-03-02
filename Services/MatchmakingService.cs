@@ -39,31 +39,29 @@ public class MatchmakingService
         }
 
         // 1. Define unityPlayers BEFORE the try block
+        // 1. Define unityPlayers
         var unityPlayers = new List<UnityMatchmakingPlayer>
-        {
-            new UnityMatchmakingPlayer { Id = userId }
-        };
+{
+    new UnityMatchmakingPlayer { Id = userId }
+};
 
-        // 2. Format attributes (Removing Lists/Arrays to avoid Error 55)
-        var unityAttributes = new Dictionary<string, object>
-        {
-            { "mode", mode },
-            { "region", region },
-            { "playersPerMatch", (double)playersNeeded }
-        };
+        // 2. Start with an EMPTY dictionary to test the queue connection
+        // If this succeeds, you need to add "mode" and "region" to your 
+        // Matchmaker Config in the Unity Dashboard before sending them here.
+        var unityAttributes = new Dictionary<string, object>();
 
         string unityTicketId;
         try
         {
-            // FIX: Ensure this matches your Unity Dashboard exactly (e.g., "Outer Edge")
+            // Matches your image_5ec500.png exactly
             var queueName = "OuterEdge";
 
             unityTicketId = await _unityMatchmakingService.CreateTicketAsync(queueName, unityAttributes, unityPlayers);
-            _logger.LogInformation("Unity matchmaking ticket {UnityTicketId} created for user {UserId}.", unityTicketId, userId);
-        } // <--- Ensure this brace exists
+            _logger.LogInformation("Unity matchmaking ticket {UnityTicketId} created successfully!", unityTicketId);
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create Unity matchmaking ticket for user {UserId}.", userId);
+            _logger.LogError(ex, "Failed to create Unity matchmaking ticket.");
             throw;
         }
 
