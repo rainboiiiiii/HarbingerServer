@@ -34,12 +34,13 @@ public class UnityMatchmakingService
         var formattedAttributes = new Dictionary<string, object>();
         foreach (var attr in attributes)
         {
-            // Unity often fails if it sees an 'int' instead of a 'double' 
-            // in the JSON for matchmaking logic.
             if (attr.Value is int intVal)
                 formattedAttributes[attr.Key] = (double)intVal;
-            else
+            else if (attr.Value is float floatVal)
+                formattedAttributes[attr.Key] = (double)floatVal;
+            else if (attr.Value is string || attr.Value is double || attr.Value is bool)
                 formattedAttributes[attr.Key] = attr.Value;
+            // Skip Lists/Arrays as they cause Error 55
         }
 
         // 2. Format the players list to match the v2 expected schema
@@ -51,9 +52,9 @@ public class UnityMatchmakingService
 
         var requestBody = new
         {
-            queueName = queueName,
+            queueName = queueName, // Must match Dashboard exactly
             attributes = formattedAttributes,
-            players = formattedPlayers
+            players = players.Select(p => new { id = p.Id, properties = new Dictionary<string, object>() })
         };
 
         var json = JsonConvert.SerializeObject(requestBody);

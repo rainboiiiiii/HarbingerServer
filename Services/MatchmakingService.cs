@@ -27,36 +27,40 @@ public class MatchmakingService
     {
         _logger.LogInformation("User {UserId} enqueuing for match in mode {Mode}, region {Region} with {PlayersPerMatch} players.", userId, mode, region, playersPerMatch);
         var playersNeeded = playersPerMatch ?? _options.DefaultPlayersPerMatch;
+
         var existing = await _db.QueueTickets
             .Find(q => q.UserId == userId && q.Mode == mode && q.Region == region && q.State == "queued")
             .FirstOrDefaultAsync(ct);
+
         if (existing != null)
         {
             _logger.LogInformation("User {UserId} is already queued for mode {Mode}, region {Region}.", userId, mode, region);
             return (existing, true);
         }
 
-        // Instead of local queue, create a Unity Matchmaking ticket
+        // 1. Define unityPlayers BEFORE the try block
         var unityPlayers = new List<UnityMatchmakingPlayer>
         {
             new UnityMatchmakingPlayer { Id = userId }
         };
 
+        // 2. Format attributes (Removing Lists/Arrays to avoid Error 55)
         var unityAttributes = new Dictionary<string, object>
         {
             { "mode", mode },
             { "region", region },
-            { "playersPerMatch", playersNeeded },
-            { "equippedWeapons", equippedWeapons ?? new List<string>() },
-            { "equippedAbilities", equippedAbilities ?? new List<string>() }
+            { "playersPerMatch", (double)playersNeeded }
         };
 
         string unityTicketId;
         try
         {
-            unityTicketId = await _unityMatchmakingService.CreateTicketAsync("OuterEdge", unityAttributes, unityPlayers);
+            // FIX: Ensure this matches your Unity Dashboard exactly (e.g., "Outer Edge")
+            var queueName = "OuterEdge";
+
+            unityTicketId = await _unityMatchmakingService.CreateTicketAsync(queueName, unityAttributes, unityPlayers);
             _logger.LogInformation("Unity matchmaking ticket {UnityTicketId} created for user {UserId}.", unityTicketId, userId);
-        }
+        } // <--- Ensure this brace exists
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create Unity matchmaking ticket for user {UserId}.", userId);
