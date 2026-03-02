@@ -29,20 +29,15 @@ public class UnityIdentityService
             var accessToken = await _authService.GetAccessTokenAsync();
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-            // Ensure the environment GUID is present
-            _httpClient.DefaultRequestHeaders.Remove("Unity-Environment");
-            _httpClient.DefaultRequestHeaders.Add("Unity-Environment", "12cb99a8-fc59-4778-8128-e19c6538ebb2");
+            // ADJUSTMENT 1: Use 'UnityEnvironment' (no hyphen) as per image_193151.png
+            _httpClient.DefaultRequestHeaders.Remove("UnityEnvironment");
+            _httpClient.DefaultRequestHeaders.Add("UnityEnvironment", "production");
 
-            // Custom ID payload structure
-            var payload = new
-            {
-                externalId = localUserId
-            };
-
+            // ADJUSTMENT 2: Ensure payload matches image_193151.png
+            var payload = new { externalId = localUserId };
             var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
 
             // The specific "Server" endpoint for backend-to-backend Custom ID registration
-            // This is the V1 Player Auth Server API
             var endpoint = $"v1/projects/{_projectId}/authentication/server/custom-id";
 
             var response = await _httpClient.PostAsync(endpoint, content);
@@ -50,12 +45,13 @@ public class UnityIdentityService
 
             if (!response.IsSuccessStatusCode)
             {
+                // If you still get 403 here, double-check that the "Player Authentication Token Issuer" 
+                // role is assigned to your Service Account in the dashboard.
                 _logger.LogError("Unity Player Creation Failed: {Status} - {Content}", response.StatusCode, responseContent);
                 return null;
             }
 
-            // Unity returns a 'userId' or 'id' depending on the specific Auth endpoint
-            // The Player Auth Server API usually returns an object with 'userId'
+            // ADJUSTMENT 3: Map to the documentation's response format (idToken)
             var result = JsonConvert.DeserializeObject<UnityPlayerAuthResponse>(responseContent);
 
             _logger.LogInformation("Successfully synced Unity Player ID: {UnityId}", result?.UserId);
@@ -70,12 +66,16 @@ public class UnityIdentityService
     }
 }
 
-// Updated Helper class to match the Player Auth Server response format
+// Updated Helper class to match image_193151.png response
 public class UnityPlayerAuthResponse
 {
+    // The server API returns an idToken, which acts as the unique identifier
     [JsonProperty("userId")]
     public string UserId { get; set; } = string.Empty;
 
-    [JsonProperty("id")] // Fallback in case of variant API version
-    public string Id { set { UserId = value; } }
+    [JsonProperty("idToken")]
+    public string IdToken { set { UserId = value; } }
+
+    [JsonProperty("sessionToken")]
+    public string? SessionToken { get; set; }
 }
