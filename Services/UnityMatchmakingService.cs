@@ -30,45 +30,39 @@ public class UnityMatchmakingService
 
     public async Task<string> CreateTicketAsync(string queueName, Dictionary<string, object> attributes, List<UnityMatchmakingPlayer> players)
     {
-        // 1. Ensure attributes use numbers compatible with Unity (doubles)
+        // 1. Format attributes
         var formattedAttributes = new Dictionary<string, object>();
         foreach (var attr in attributes)
         {
-            if (attr.Value is int intVal)
-                formattedAttributes[attr.Key] = (double)intVal;
-            else if (attr.Value is float floatVal)
-                formattedAttributes[attr.Key] = (double)floatVal;
-            else if (attr.Value is string || attr.Value is double || attr.Value is bool)
-                formattedAttributes[attr.Key] = attr.Value;
-            // Skip Lists/Arrays as they cause Error 55
+            if (attr.Value is int intVal) formattedAttributes[attr.Key] = (double)intVal;
+            else if (attr.Value is float floatVal) formattedAttributes[attr.Key] = (double)floatVal;
+            else formattedAttributes[attr.Key] = attr.Value;
         }
 
-        // 2. Format the players list to match the v2 expected schema
-        // Most v2 implementations expect: { "id": "...", "properties": {} }
+        // 2. Format players - ensuring NO extra properties are sent
         var formattedPlayers = players.Select(p => new {
             id = p.Id,
-            properties = new Dictionary<string, object>() // Required even if empty
+            properties = new Dictionary<string, object>()
         }).ToList();
 
+        // 3. Construct Request Body (Strict v2 Schema)
         var requestBody = new
         {
-            queueName = queueName, // Must match Dashboard exactly
+            queueName = queueName,
             attributes = formattedAttributes,
-            players = players.Select(p => new { id = p.Id, properties = new Dictionary<string, object>() })
+            players = formattedPlayers // Use the pre-formatted list here
         };
 
         var json = JsonConvert.SerializeObject(requestBody);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
+        // 4. Auth and Send
         string accessToken = await _authService.GetAccessTokenAsync();
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        const string endpoint = "v2/tickets";
-
-        // Log the JSON body so you can see exactly what is being sent
         _logger.LogInformation("Sending Ticket Body: {Json}", json);
 
-        var response = await _httpClient.PostAsync(endpoint, content);
+        var response = await _httpClient.PostAsync("v2/tickets", content);
         var responseContent = await response.Content.ReadAsStringAsync();
 
         if (response.IsSuccessStatusCode)
