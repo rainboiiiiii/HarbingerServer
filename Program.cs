@@ -22,6 +22,9 @@ builder.Services.Configure<GameServerOptions>(builder.Configuration.GetSection("
 builder.Services.Configure<UnityMatchmakingOptions>(builder.Configuration.GetSection("UnityMatchmaking"));
 builder.Services.Configure<UnityAuthOptions>(builder.Configuration.GetSection("UnityAuth"));
 builder.Services.AddHttpClient<UnityAuthService>();
+builder.Services.AddHttpClient<UnityMatchmakingService>();
+builder.Services.AddHttpClient<GameServerService>();
+builder.Services.AddHttpClient<UnityIdentityService>();
 
 builder.Services.Configure<JsonOptions>(options =>
 {
