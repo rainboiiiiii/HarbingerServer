@@ -23,6 +23,7 @@ public static class AccountEndpoints
 
     private static async Task<IResult> SignupAsync(
         SignupRequest request,
+        UnityIdentityService unityIdentityService, // <--- New Dependency
         MongoDbContext db,
         PasswordService passwordService,
         JwtTokenService jwtTokenService,
@@ -67,6 +68,9 @@ public static class AccountEndpoints
             Crystals = 100,
             Level = 1
         };
+
+        var unityId = await unityIdentityService.CreateUnityPlayerAsync(user.Id);
+        user.UnityPlayerId = unityId;
 
         try
         {

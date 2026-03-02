@@ -35,17 +35,14 @@ public class UnityMatchmakingService
         string accessToken = await _authService.GetAccessTokenAsync();
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        // 1. Try using the Environment ID (GUID) - ensure NO extra spaces
-        _httpClient.DefaultRequestHeaders.Remove("Unity-Environment");
-        _httpClient.DefaultRequestHeaders.Add("Unity-Environment", "12cb99a8-fc59-4778-8128-e19c6538ebb2");
-
-        // 2. Set Impersonation
-        var firstPlayerId = players.FirstOrDefault()?.Id ?? "unknown";
+        // FIX: Remove impersonation entirely for this test
+        // Some backend-to-backend flows reject impersonation if the ID isn't a 
+        // registered Unity Player ID.
         _httpClient.DefaultRequestHeaders.Remove("impersonated-user-id");
-        _httpClient.DefaultRequestHeaders.Add("impersonated-user-id", firstPlayerId);
 
-        // 3. The "Legacy-Compatible" JSON Structure
-        // V2 often requires 'attributes' and 'properties' to exist as objects, not nulls
+        _httpClient.DefaultRequestHeaders.Remove("Unity-Environment");
+        _httpClient.DefaultRequestHeaders.Add("Unity-Environment", "production");
+
         var requestBody = new
         {
             queueName = queueName,
@@ -59,14 +56,12 @@ public class UnityMatchmakingService
         var json = JsonConvert.SerializeObject(requestBody);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        // Use the global endpoint - the 404 on the project-path suggests 
-        // your project is configured for the standard V2 routing.
         var response = await _httpClient.PostAsync("v2/tickets", content);
         var responseContent = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogError("Unity Error 55. RequestBody: {Json} | Response: {Error}", json, responseContent);
+            _logger.LogError("Final Gate Failure: {Error}", responseContent);
             throw new HttpRequestException($"Matchmaking Error: {response.StatusCode} - {responseContent}");
         }
 

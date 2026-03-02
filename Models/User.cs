@@ -10,6 +10,9 @@ public class User
     [BsonRepresentation(BsonType.String)]
     public string Id { get; set; } = string.Empty;
 
+    [BsonElement("unityPlayerId")]
+    public string? UnityPlayerId { get; set; } // The GUID from UGS
+
     [BsonElement("username")]
     public string Username { get; set; } = string.Empty;
 
