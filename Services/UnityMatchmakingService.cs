@@ -32,49 +32,33 @@ public class UnityMatchmakingService
 
     public async Task<string> CreateTicketAsync(string queueName, Dictionary<string, object> attributes, List<UnityMatchmakingPlayer> players)
     {
-        // 1. Format attributes
-        var formattedAttributes = new Dictionary<string, object>();
-        foreach (var attr in attributes)
-        {
-            if (attr.Value is int intVal) formattedAttributes[attr.Key] = (double)intVal;
-            else if (attr.Value is float floatVal) formattedAttributes[attr.Key] = (double)floatVal;
-            else formattedAttributes[attr.Key] = attr.Value;
-        }
-
-        // 2. Format players - ensuring NO extra properties are sent
-        var formattedPlayers = players.Select(p => new {
-            id = p.Id,
-            properties = new Dictionary<string, object>()
-        }).ToList();
-
-        // 3. Construct Request Body (Strict v2 Schema)
         var requestBody = new
         {
             queueName = queueName,
-            attributes = formattedAttributes,
-            players = formattedPlayers // Use the pre-formatted list here
+            attributes = attributes ?? new Dictionary<string, object>(),
+            players = players.Select(p => new {
+                id = p.Id,
+                properties = new Dictionary<string, object>()
+            }).ToList()
         };
 
         var json = JsonConvert.SerializeObject(requestBody);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        // 4. Auth and Send
         string accessToken = await _authService.GetAccessTokenAsync();
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-        _logger.LogInformation("Sending Ticket Body: {Json}", json);
+        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
         var response = await _httpClient.PostAsync("v2/tickets", content);
         var responseContent = await response.Content.ReadAsStringAsync();
 
-        if (response.IsSuccessStatusCode)
+        if (!response.IsSuccessStatusCode)
         {
-            var ticketResponse = JsonConvert.DeserializeObject<UnityMatchmakingTicketResponse>(responseContent);
-            return ticketResponse?.Id ?? throw new Exception("Ticket ID missing.");
+            _logger.LogError("Unity Error 55 Detail: {Error}", responseContent);
+            throw new HttpRequestException($"Unity Matchmaking Error: {response.StatusCode} - {responseContent}");
         }
 
-        _logger.LogError("Unity Error 55 Detail: {Error}", responseContent);
-        throw new HttpRequestException($"Unity Matchmaking Error: {response.StatusCode} - {responseContent}");
+        var ticketResponse = JsonConvert.DeserializeObject<UnityMatchmakingTicketResponse>(responseContent);
+        return ticketResponse?.Id ?? throw new Exception("Ticket ID missing.");
     }
 
     public async Task DeleteTicketAsync(string ticketId)
