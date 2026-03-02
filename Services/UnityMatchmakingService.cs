@@ -23,42 +23,56 @@ public class UnityMatchmakingService
 
         _httpClient.BaseAddress = new Uri(_options.BaseUrl.TrimEnd('/') + "/");
 
-        // Required Headers
+        // Required Project ID Header
         _httpClient.DefaultRequestHeaders.Add("X-Unity-Services-Project-Id", _options.ProjectId);
 
-        // Use the ID from your screenshot image_5deb29.png
+        // Required Environment ID Header (Production ID from your dashboard)
         _httpClient.DefaultRequestHeaders.Add("Unity-Environment", "12cb99a8-fc59-4778-8128-e19c6538ebb2");
     }
 
     public async Task<string> CreateTicketAsync(string queueName, Dictionary<string, object> attributes, List<UnityMatchmakingPlayer> players)
     {
+        // 1. Refresh Auth Token
+        string accessToken = await _authService.GetAccessTokenAsync();
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        // 2. Set Impersonation Header (Required for Backend-to-Backend Service Accounts)
+        var firstPlayerId = players.FirstOrDefault()?.Id ?? "unknown";
+        _httpClient.DefaultRequestHeaders.Remove("impersonated-user-id");
+        _httpClient.DefaultRequestHeaders.Add("impersonated-user-id", firstPlayerId);
+
+        // 3. Construct the Payload
+        // We use a simplified player object to avoid property-validation errors
         var requestBody = new
         {
             queueName = queueName,
             attributes = attributes ?? new Dictionary<string, object>(),
-            players = players.Select(p => new {
-                id = p.Id,
-                properties = new Dictionary<string, object>()
-            }).ToList()
+            players = players.Select(p => new { id = p.Id }).ToList()
         };
 
         var json = JsonConvert.SerializeObject(requestBody);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        string accessToken = await _authService.GetAccessTokenAsync();
-        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        _logger.LogInformation("Attempting Ticket Creation for Queue: {Queue}. Body: {Json}", queueName, json);
 
+        // 4. Send Request
         var response = await _httpClient.PostAsync("v2/tickets", content);
         var responseContent = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogError("Unity Error 55 Detail: {Error}", responseContent);
+            _logger.LogError("Unity Error 55 (InvalidRequest). Response: {Error}", responseContent);
             throw new HttpRequestException($"Unity Matchmaking Error: {response.StatusCode} - {responseContent}");
         }
 
         var ticketResponse = JsonConvert.DeserializeObject<UnityMatchmakingTicketResponse>(responseContent);
-        return ticketResponse?.Id ?? throw new Exception("Ticket ID missing.");
+
+        if (ticketResponse == null || string.IsNullOrEmpty(ticketResponse.Id))
+        {
+            throw new Exception("Unity returned a success code but the Ticket ID was null or empty.");
+        }
+
+        return ticketResponse.Id;
     }
 
     public async Task DeleteTicketAsync(string ticketId)
@@ -66,7 +80,6 @@ public class UnityMatchmakingService
         string accessToken = await _authService.GetAccessTokenAsync();
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        // Remove leading slash to prevent //tickets
         var response = await _httpClient.DeleteAsync($"v2/tickets/{ticketId}");
 
         if (!response.IsSuccessStatusCode)
@@ -81,7 +94,6 @@ public class UnityMatchmakingService
         string accessToken = await _authService.GetAccessTokenAsync();
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        // Use v2 and remove leading slash
         var response = await _httpClient.GetAsync($"v2/tickets/{ticketId}/status");
         var content = await response.Content.ReadAsStringAsync();
 
@@ -98,7 +110,6 @@ public class UnityMatchmakingService
         string accessToken = await _authService.GetAccessTokenAsync();
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        // Note: The results endpoint usually requires the project ID in the path
         var endpoint = $"v2/projects/{_options.ProjectId}/matches/{matchId}/matchmaking-results";
 
         _logger.LogInformation("Fetching match results from: {Endpoint}", endpoint);
