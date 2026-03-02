@@ -18,7 +18,8 @@ public class UnityIdentityService
         // Hardcoding for immediate testing
         _projectId = "3f735ce7-0797-4b51-98c9-e7abfcb3b585";
 
-        _httpClient.BaseAddress = new Uri("https://services.api.unity.com/auth/v1/");
+        // IMPORTANT: The Player Auth API uses a different subdomain than the general Admin API
+        _httpClient.BaseAddress = new Uri("https://player-auth.services.api.unity.com/");
     }
 
     public async Task<string?> CreateUnityPlayerAsync(string localUserId)
@@ -28,15 +29,23 @@ public class UnityIdentityService
             var accessToken = await _authService.GetAccessTokenAsync();
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-            // REQUIRED: Specify the environment (Production vs Development)
-            // Without this, Unity doesn't know where to "create" the player
+            // Ensure the environment GUID is present
             _httpClient.DefaultRequestHeaders.Remove("Unity-Environment");
             _httpClient.DefaultRequestHeaders.Add("Unity-Environment", "12cb99a8-fc59-4778-8128-e19c6538ebb2");
 
-            var payload = new { externalId = localUserId };
+            // Custom ID payload structure
+            var payload = new
+            {
+                externalId = localUserId
+            };
+
             var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("projects/3f735ce7-0797-4b51-98c9-e7abfcb3b585/external-identity/sign-up", content);
+            // The specific "Server" endpoint for backend-to-backend Custom ID registration
+            // This is the V1 Player Auth Server API
+            var endpoint = $"v1/projects/{_projectId}/authentication/server/custom-id";
+
+            var response = await _httpClient.PostAsync(endpoint, content);
             var responseContent = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
@@ -45,9 +54,13 @@ public class UnityIdentityService
                 return null;
             }
 
-            // Using a concrete class for deserialization is safer than dynamic
-            var result = JsonConvert.DeserializeObject<UnityPlayerResponse>(responseContent);
-            return result?.Id;
+            // Unity returns a 'userId' or 'id' depending on the specific Auth endpoint
+            // The Player Auth Server API usually returns an object with 'userId'
+            var result = JsonConvert.DeserializeObject<UnityPlayerAuthResponse>(responseContent);
+
+            _logger.LogInformation("Successfully synced Unity Player ID: {UnityId}", result?.UserId);
+
+            return result?.UserId;
         }
         catch (Exception ex)
         {
@@ -57,9 +70,12 @@ public class UnityIdentityService
     }
 }
 
-// Helper class for parsing
-public class UnityPlayerResponse
+// Updated Helper class to match the Player Auth Server response format
+public class UnityPlayerAuthResponse
 {
-    [JsonProperty("id")]
-    public string Id { get; set; } = string.Empty;
+    [JsonProperty("userId")]
+    public string UserId { get; set; } = string.Empty;
+
+    [JsonProperty("id")] // Fallback in case of variant API version
+    public string Id { set { UserId = value; } }
 }
