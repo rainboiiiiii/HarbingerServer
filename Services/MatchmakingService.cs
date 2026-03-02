@@ -38,11 +38,18 @@ public class MatchmakingService
             return (existing, true);
         }
 
+
+
         // 1. Define unityPlayers BEFORE the try block
         // 1. Define unityPlayers
+        var unityId = Guid.TryParse(userId, out _) ? userId : Guid.NewGuid().ToString();
+
         var unityPlayers = new List<UnityMatchmakingPlayer>
 {
-    new UnityMatchmakingPlayer { Id = userId }
+    new UnityMatchmakingPlayer
+    {
+        Id = unityId // This will now be a long string like '550e8400-e29b...'
+    }
 };
 
         // 2. Start with an EMPTY dictionary to test the queue connection

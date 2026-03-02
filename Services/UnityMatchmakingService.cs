@@ -47,7 +47,10 @@ public class UnityMatchmakingService
         {
             queueName = queueName,
             attributes = attributes ?? new Dictionary<string, object>(),
-            players = players.Select(p => new { id = p.Id }).ToList()
+            players = players.Select(p => new {
+                id = p.Id,
+                customData = new Dictionary<string, object>() // Use 'customData' instead of 'properties'
+            }).ToList()
         };
 
         var json = JsonConvert.SerializeObject(requestBody);
