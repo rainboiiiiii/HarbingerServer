@@ -33,15 +33,13 @@ public class UnityMatchmakingService
     public async Task<string> CreateTicketAsync(string queueName, Dictionary<string, object> attributes, List<UnityMatchmakingPlayer> players)
     {
         string accessToken = await _authService.GetAccessTokenAsync();
-        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        // 1. Ensure the impersonation header is present
         var firstPlayerId = players.FirstOrDefault()?.Id ?? "unknown";
         _httpClient.DefaultRequestHeaders.Remove("impersonated-user-id");
         _httpClient.DefaultRequestHeaders.Add("impersonated-user-id", firstPlayerId);
 
-        // 2. Use a BARE anonymous object. 
-        // Do NOT include 'attributes' or 'customData' if they are empty.
+        // FIX: Construct the body with the most basic possible structure
         var requestBody = new
         {
             queueName = queueName,
@@ -51,14 +49,26 @@ public class UnityMatchmakingService
         var json = JsonConvert.SerializeObject(requestBody);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        _logger.LogInformation("Sending Bare Ticket: {Json}", json);
+        // FIX: Try the Project-Specific URL path
+        // Some Unity regions require the Project ID in the URL to route the ticket correctly
+        var projectSpecificUrl = $"v2/projects/{_options.ProjectId}/tickets";
 
-        var response = await _httpClient.PostAsync("v2/tickets", content);
+        _logger.LogInformation("Posting to: {Url}", projectSpecificUrl);
+
+        var response = await _httpClient.PostAsync(projectSpecificUrl, content);
         var responseContent = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogError("Unity Error 55 Detail: {Error}", responseContent);
+            // If the project-specific URL fails, try the global one as a fallback
+            _logger.LogWarning("Project URL failed, trying global v2/tickets fallback...");
+            response = await _httpClient.PostAsync("v2/tickets", content);
+            responseContent = await response.Content.ReadAsStringAsync();
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("Unity Error 55 Final Detail: {Error}", responseContent);
             throw new HttpRequestException($"Unity Matchmaking Error: {response.StatusCode} - {responseContent}");
         }
 
